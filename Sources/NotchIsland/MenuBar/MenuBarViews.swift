@@ -85,9 +85,8 @@ struct MenuBarStat: View {
     }
 }
 
-/// Батарейка без рамки, как у macOS: полупрозрачный корпус, светлая заливка по заряду (зелёная при
-/// зарядке, жёлтая и красная при низком заряде), проценты прямо на ней. Цифры над заливкой — тёмные,
-/// над пустой частью — светлые
+/// Батарейка без рамки: светлый корпус, ярче — заряд (белый; зелёный при зарядке, жёлтый и красный
+/// при низком заряде), проценты прямо на ней — тёмные, одним цветом: читаются на любой части
 struct BatteryGlyph: View {
     let level: Double
     let charging: Bool
@@ -98,25 +97,23 @@ struct BatteryGlyph: View {
         let shape = RoundedRectangle(cornerRadius: 4, style: .continuous)
         HStack(spacing: 1.5) {
             GeometryReader { g in
-                let fill = g.size.width * CGFloat(min(max(level, 0), 1))
                 ZStack(alignment: .leading) {
-                    shape.fill(Color.white.opacity(0.22))
-                    Rectangle().fill(fillColor).frame(width: fill)
-                    label.foregroundStyle(Color.white)
+                    shape.fill(Color.white.opacity(0.5))
+                    Rectangle().fill(fillColor)
+                        .frame(width: g.size.width * CGFloat(min(max(level, 0), 1)))
                     label.foregroundStyle(Color.black.opacity(0.85))
-                        .mask(alignment: .leading) { Rectangle().frame(width: fill) }
                 }
                 .clipShape(shape)
             }
             RoundedRectangle(cornerRadius: 1, style: .continuous)
-                .fill(Color.white.opacity(0.3))
+                .fill(Color.white.opacity(0.5))
                 .frame(width: 2, height: 5)
         }
     }
 
     var fillColor: Color {
-        if charging || level >= 0.2 { return charging ? Theme.ok : Color.white }
-        return color
+        if charging { return Theme.ok }
+        return level >= 0.2 ? Color.white : color
     }
 
     var label: some View {

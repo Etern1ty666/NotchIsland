@@ -38,11 +38,9 @@ struct IslandView: View {
                 .clipShape(shape)
         }
         .frame(width: bodyW + 2 * flare, height: h)
-        // после установки и обновления: зелёное свечение вокруг выреза, пока остров не раскроют
-        .background(alignment: .top) {
-            if state.showHint && !ex {
-                HintGlow(size: CGSize(width: bodyW + 2 * flare, height: h))
-            }
+        // после установки и обновления: зелёная линия по краю острова, пока его не раскроют
+        .overlay {
+            if state.showHint && !ex { HintGlow(shape: shape) }
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
             .ignoresSafeArea()
@@ -178,21 +176,16 @@ struct BarsIcon: Shape {
     }
 }
 
-/// Пульсирующее зелёное свечение вокруг свёрнутого острова — подсказка «курсор сюда».
-/// Форма выше острова и уходит за верх экрана: так бока светятся по всей высоте так же,
-/// как низ, а отступ одинаковый слева, справа и снизу
+/// Подсказка «курсор сюда» вокруг свёрнутого острова: чёткая зелёная линия ровно по его краю
+/// с лёгким ореолом, пульсирует яркостью. Верхний край приходится на сам вырез — его не видно
 struct HintGlow: View {
-    let size: CGSize
+    let shape: IslandShape
     @State private var pulse = false
 
     var body: some View {
-        let outset: CGFloat = 4, above: CGFloat = 24
-        IslandShape(top: 0, bottom: 14)
-            .fill(Theme.ok)
-            .frame(width: size.width + 2 * outset, height: size.height + outset + above)
-            .offset(y: -above)
-            .blur(radius: pulse ? 9 : 5)
-            .opacity(pulse ? 1 : 0.4)
+        shape.stroke(Theme.ok, lineWidth: 2.5)
+            .shadow(color: Theme.ok.opacity(0.8), radius: pulse ? 5 : 2)
+            .opacity(pulse ? 1 : 0.45)
             .allowsHitTesting(false)
             .onAppear {
                 withAnimation(.easeInOut(duration: 1.1).repeatForever(autoreverses: true)) { pulse = true }
