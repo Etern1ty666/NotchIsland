@@ -210,6 +210,10 @@ final class IslandController: NSObject {
         panel.ignoresMouseEvents = false
         hitPanel.ignoresMouseEvents = true
         state.expanded = true
+        if state.showHint {
+            state.showHint = false
+            UserDefaults.standard.set(true, forKey: DefaultsKey.islandHintShown)
+        }
     }
 
     func collapse() {

@@ -34,6 +34,12 @@ struct IslandView: View {
                     .allowsHitTesting(ex)
             }
             .clipShape(shape)
+            // первый запуск: зелёное свечение вокруг выреза, пока остров ни разу не раскрывали
+            .background(alignment: .top) {
+                if state.showHint && !ex {
+                    HintGlow(shape: shape, size: CGSize(width: bodyW + 2 * flare, height: h))
+                }
+            }
             .shadow(color: Color.black.opacity(ex ? 0.45 : 0), radius: 14, y: 6)
             .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
             .ignoresSafeArea()
@@ -166,5 +172,23 @@ struct BarsIcon: Shape {
             p.addRoundedRect(in: bar, cornerSize: CGSize(width: w / 2, height: w / 2), style: .continuous)
         }
         return p
+    }
+}
+
+/// Пульсирующее зелёное свечение по форме острова — подсказка «наведи сюда курсор»
+struct HintGlow: View {
+    let shape: IslandShape
+    let size: CGSize
+    @State private var pulse = false
+
+    var body: some View {
+        shape.fill(Theme.ok)
+            .frame(width: size.width + 6, height: size.height + 3)
+            .blur(radius: pulse ? 9 : 4)
+            .opacity(pulse ? 0.95 : 0.35)
+            .allowsHitTesting(false)
+            .onAppear {
+                withAnimation(.easeInOut(duration: 1.1).repeatForever(autoreverses: true)) { pulse = true }
+            }
     }
 }

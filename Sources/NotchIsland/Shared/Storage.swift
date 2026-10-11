@@ -18,6 +18,8 @@ enum DefaultsKey {
     static let claudeAccount = "claudeAccountEnabled"
     /// Буфер: срок хранения истории
     static let clipRetention = "clipRetention"
+    /// Остров уже раскрывали — зелёная подсказка вокруг выреза больше не нужна
+    static let islandHintShown = "islandHintShown"
     /// Автозапуск уже включали один раз после установки
     static let autostartInitialized = "autostartInitialized"
 }

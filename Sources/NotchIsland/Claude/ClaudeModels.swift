@@ -10,11 +10,18 @@ enum ClaudeWidget: String, CaseIterable, Identifiable {
         case .week: return "Неделя"
         }
     }
-    /// Подпись в строке меню — какое это окно
+    /// Какое это окно — в настройках
     var short: String {
         switch self {
         case .session: return "5 часов"
         case .week: return "неделя"
+        }
+    }
+    /// То же коротко — в строке меню
+    var menuBarLabel: String {
+        switch self {
+        case .session: return "5 ч"
+        case .week: return "Нед"
         }
     }
 }

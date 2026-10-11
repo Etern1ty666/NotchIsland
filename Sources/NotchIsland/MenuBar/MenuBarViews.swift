@@ -74,33 +74,38 @@ struct MenuBarStat: View {
     }
 }
 
-/// Батарейка: корпус с «носиком», заливка по заряду, проценты (и молния при зарядке) прямо на ней.
-/// Цифры над заливкой — тёмные, над пустой частью — светлые
+/// Батарейка без рамки, как у macOS: полупрозрачный корпус, светлая заливка по заряду (зелёная при
+/// зарядке, жёлтая и красная при низком заряде), проценты прямо на ней. Цифры над заливкой — тёмные,
+/// над пустой частью — светлые
 struct BatteryGlyph: View {
     let level: Double
     let charging: Bool
+    /// Цвет заряда из статистики: им красим заливку при зарядке и низком заряде
     let color: Color
 
     var body: some View {
-        HStack(spacing: 1) {
+        let shape = RoundedRectangle(cornerRadius: 4, style: .continuous)
+        HStack(spacing: 1.5) {
             GeometryReader { g in
-                let inner = g.size.width - 3
-                let fill = inner * CGFloat(min(max(level, 0), 1))
-                ZStack {
-                    RoundedRectangle(cornerRadius: 3.5, style: .continuous)
-                        .strokeBorder(Color.white.opacity(0.45), lineWidth: 1)
-                    RoundedRectangle(cornerRadius: 2, style: .continuous)
-                        .fill(color)
-                        .frame(width: fill)
-                        .frame(maxWidth: .infinity, alignment: .leading)
-                        .padding(1.5)
+                let fill = g.size.width * CGFloat(min(max(level, 0), 1))
+                ZStack(alignment: .leading) {
+                    shape.fill(Color.white.opacity(0.35))
+                    Rectangle().fill(fillColor).frame(width: fill)
                     label.foregroundStyle(Color.white)
-                    label.foregroundStyle(Color.black.opacity(0.8))
-                        .mask(alignment: .leading) { Rectangle().frame(width: fill + 1.5) }
+                    label.foregroundStyle(Color.black.opacity(0.85))
+                        .mask(alignment: .leading) { Rectangle().frame(width: fill) }
                 }
+                .clipShape(shape)
             }
-            RoundedRectangle(cornerRadius: 1).fill(Color.white.opacity(0.45)).frame(width: 2, height: 5)
+            RoundedRectangle(cornerRadius: 1, style: .continuous)
+                .fill(Color.white.opacity(0.35))
+                .frame(width: 2, height: 5)
         }
+    }
+
+    var fillColor: Color {
+        if charging || level >= 0.2 { return charging ? Theme.ok : Color.white }
+        return color
     }
 
     var label: some View {
@@ -113,8 +118,8 @@ struct BatteryGlyph: View {
     }
 }
 
-/// Лимит подписки Claude в строке меню: значок (цвет — по расходу), проценты и подпись в две строки:
-/// какое окно («5 часов» или «неделя») и сколько до сброса
+/// Лимит подписки Claude в строке меню: шкала расхода, значок, проценты и подпись в две строки:
+/// какое окно («5 ч» или «Нед») и сколько до сброса
 struct MenuBarClaude: View {
     let widget: ClaudeWidget
     @ObservedObject var usage: ClaudeUsage
@@ -122,9 +127,11 @@ struct MenuBarClaude: View {
     var body: some View {
         let w = usage.window(widget)
         HStack(spacing: 5) {
+            GaugeView(gauge: .bar(w?.spent ?? 0), color: claudeColor(w))
+                .frame(width: 24, height: 5)
             Image(systemName: "sparkles")
                 .font(.system(size: 11, weight: .semibold))
-                .foregroundStyle(claudeColor(w))
+                .foregroundStyle(Color.white.opacity(0.75))
             if let w {
                 percentText(w.spent, size: 12, warn: false, color: claudeNumberColor(w))
             } else {
@@ -133,7 +140,7 @@ struct MenuBarClaude: View {
                     .foregroundStyle(Color.white.opacity(0.5))
             }
             VStack(alignment: .leading, spacing: -1) {
-                Text(widget.short)
+                Text(widget.menuBarLabel)
                 Text("↻ " + resetShort(w))
             }
             .font(.system(size: 9, weight: .semibold, design: .rounded).monospacedDigit())

@@ -12,6 +12,9 @@ final class IslandState: ObservableObject {
     @Published var notch = CGSize(width: 180, height: 32)
     /// Открыта страница настроек (шестерёнка справа от zzz) — вместо вкладки
     @Published var showSettings = false
+    /// Первый запуск: вокруг выреза пульсирует зелёное свечение — «наведи сюда курсор».
+    /// Гаснет, когда остров раскроют впервые
+    @Published var showHint = !UserDefaults.standard.bool(forKey: DefaultsKey.islandHintShown)
     /// Есть обновление или оно ставится — внизу острова полоса с кнопкой и прогрессом
     @Published var updateBar = false
     /// Показать меню «не засыпать» под кнопкой (её рамка в координатах острова)
