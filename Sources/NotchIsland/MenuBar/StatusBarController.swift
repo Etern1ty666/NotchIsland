@@ -3,7 +3,7 @@ import SwiftUI
 import Combine
 
 /// Значки в строке меню: статистики и лимиты Claude (какие закреплены), «Держать экран включенным»
-/// и обычная иконка приложения, когда больше ничего нашего нет. У всех одно меню
+/// и обычная иконка приложения, когда больше ничего нашего нет. У каждого своё меню (StatusBarMenus)
 @MainActor
 final class StatusBarController: NSObject, NSMenuDelegate {
     let stats: SystemStats
@@ -20,6 +20,8 @@ final class StatusBarController: NSObject, NSMenuDelegate {
     /// Обычная иконка приложения — только когда в строке меню больше ничего нашего нет
     var appItem: NSStatusItem?
     var bag = Set<AnyCancellable>()
+    /// Чьё это меню — по нему menuNeedsUpdate решает, что показать
+    var menuKinds: [ObjectIdentifier: MenuKind] = [:]
 
     init(stats: SystemStats, statsSettings: StatsSettings, usage: ClaudeUsage, awake: KeepAwake, updater: Updater) {
         self.stats = stats
@@ -32,17 +34,17 @@ final class StatusBarController: NSObject, NSMenuDelegate {
         // macOS ставит каждый новый значок левее предыдущих, поэтому создаём справа налево:
         // «Держать экран включенным» — первым, он всегда крайний справа среди наших.
         // autosaveName запоминает, куда пользователь перетащил значок с ⌘
-        awakeItem = makeItem("awake.right", content: MenuBarAwake(awake: awake))
-        appItem = makeItem("app")
+        awakeItem = makeItem("awake.right", kind: .awake, content: MenuBarAwake(awake: awake))
+        appItem = makeItem("app", kind: .app)
         appItem?.button?.image = Self.makeMenuBarIcon()
         appItem?.button?.toolTip = "NotchIsland"
         for w in ClaudeWidget.allCases.reversed() {
-            let item = makeItem("claude.\(w.rawValue)", content: MenuBarClaude(widget: w, usage: usage))
+            let item = makeItem("claude.\(w.rawValue)", kind: .claude(w), content: MenuBarClaude(widget: w, usage: usage))
             item.length = ceil(measure(w) + 9)   // запас под двузначные проценты
             claudeItems[w] = item
         }
         for s in Stat.allCases.reversed() {
-            let item = makeItem("stat.\(s.rawValue)", content: MenuBarStat(stat: s, stats: stats))
+            let item = makeItem("stat.\(s.rawValue)", kind: .stat(s), content: MenuBarStat(stat: s, stats: stats))
             item.length = ceil(measure(s) + reserve(s))
             statItems[s] = item
         }
@@ -73,18 +75,19 @@ final class StatusBarController: NSObject, NSMenuDelegate {
             .store(in: &bag)
     }
 
-    private func makeItem(_ name: String) -> NSStatusItem {
+    private func makeItem(_ name: String, kind: MenuKind) -> NSStatusItem {
         let item = NSStatusBar.system.statusItem(withLength: NSStatusItem.variableLength)
         item.autosaveName = name
         let menu = NSMenu()
         menu.delegate = self   // содержимое собирается заново при каждом открытии
         menu.autoenablesItems = false
+        menuKinds[ObjectIdentifier(menu)] = kind
         item.menu = menu
         return item
     }
 
-    private func makeItem<V: View>(_ name: String, content: V) -> NSStatusItem {
-        let item = makeItem(name)
+    private func makeItem<V: View>(_ name: String, kind: MenuKind, content: V) -> NSStatusItem {
+        let item = makeItem(name, kind: kind)
         if let button = item.button {
             let v = PassthroughHostingView(rootView: content)
             v.frame = button.bounds
@@ -167,75 +170,5 @@ final class StatusBarController: NSObject, NSMenuDelegate {
         }
         img.isTemplate = true
         return img
-    }
-
-    /// Одно и то же меню у всех наших значков
-    func menuNeedsUpdate(_ menu: NSMenu) {
-        menu.removeAllItems()
-        let header = NSMenuItem(title: "Показывать в строке меню", action: nil, keyEquivalent: "")
-        header.isEnabled = false
-        menu.addItem(header)
-        for s in stats.available {
-            let item = addItem(to: menu, s.title, #selector(toggleStat(_:)))
-            item.representedObject = s.rawValue
-            item.state = statsSettings.pinned.contains(s) ? .on : .off
-            item.indentationLevel = 1
-        }
-        for w in ClaudeWidget.allCases {
-            let item = addItem(to: menu, "Claude · " + w.title, #selector(toggleClaude(_:)))
-            item.representedObject = w.rawValue
-            item.state = statsSettings.pinnedClaude.contains(w) ? .on : .off
-            item.indentationLevel = 1
-        }
-        _ = addItem(to: menu, "Открыть «Мониторинг системы»", #selector(openActivityMonitor))
-        menu.addItem(.separator())
-
-        let awakeMenu = NSMenuItem(title: KeepAwake.title, action: nil, keyEquivalent: "")
-        awakeMenu.state = awake.active ? .on : .off
-        awakeMenu.submenu = awake.makeMenu(header: false)
-        menu.addItem(awakeMenu)
-        LoginItem.shared.refresh()
-        let login = addItem(to: menu, "Запускать при входе", #selector(toggleLogin))
-        login.state = LoginItem.shared.enabled ? .on : .off
-        login.isEnabled = LoginItem.shared.available
-        menu.addItem(.separator())
-        if let v = updater.availableVersion {
-            _ = addItem(to: menu, "Обновить до версии \(v)", #selector(installUpdate))
-        }
-        _ = addItem(to: menu, "Проверить обновления…", #selector(checkForUpdates))
-        let version = NSMenuItem(title: "NotchIsland \(Updater.currentVersion)", action: nil, keyEquivalent: "")
-        version.isEnabled = false
-        menu.addItem(version)
-        menu.addItem(.separator())
-        menu.addItem(withTitle: "Выйти из NotchIsland", action: #selector(NSApplication.terminate(_:)), keyEquivalent: "q")
-    }
-
-    private func addItem(to menu: NSMenu, _ title: String, _ action: Selector) -> NSMenuItem {
-        let item = NSMenuItem(title: title, action: action, keyEquivalent: "")
-        item.target = self
-        menu.addItem(item)
-        return item
-    }
-
-    @objc func toggleStat(_ sender: NSMenuItem) {
-        guard let raw = sender.representedObject as? String, let s = Stat(rawValue: raw) else { return }
-        statsSettings.toggle(s)
-    }
-
-    @objc func toggleClaude(_ sender: NSMenuItem) {
-        guard let raw = sender.representedObject as? String, let w = ClaudeWidget(rawValue: raw) else { return }
-        statsSettings.toggle(w)
-    }
-
-    @objc func toggleLogin() {
-        LoginItem.shared.set(!LoginItem.shared.enabled)
-    }
-
-    @objc func installUpdate() { updater.update() }
-
-    @objc func checkForUpdates() { updater.checkForUpdates() }
-
-    @objc func openActivityMonitor() {
-        SystemStats.openActivityMonitor()
     }
 }

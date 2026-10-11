@@ -75,6 +75,12 @@ final class KeepAwake: NSObject, ObservableObject {
     func makeMenu(header: Bool) -> NSMenu {
         let menu = NSMenu()
         menu.autoenablesItems = false
+        fill(menu, header: header)
+        return menu
+    }
+
+    /// Пункты меню сроков — в готовое меню (у значка zzz в строке меню оно своё)
+    func fill(_ menu: NSMenu, header: Bool) {
         if header {
             let title = NSMenuItem(title: Self.title, action: nil, keyEquivalent: "")
             title.isEnabled = false
@@ -105,7 +111,6 @@ final class KeepAwake: NSObject, ObservableObject {
             off.target = self
             menu.addItem(off)
         }
-        return menu
     }
 
     @objc private func pick(_ sender: NSMenuItem) {
