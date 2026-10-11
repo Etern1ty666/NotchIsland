@@ -35,15 +35,15 @@ struct UpdateStatus: View {
         case .checking:
             busy("Проверяю")
         case .upToDate:
-            Label("Последняя версия", systemImage: "checkmark.circle.fill")
+            Label(L("Последняя версия"), systemImage: "checkmark.circle.fill")
                 .font(.system(size: 11, weight: .semibold))
                 .foregroundStyle(Theme.ok)
         case .available(let v), .ready(let v):
-            PillButton(title: "Обновить до \(v)") { updater.update() }
+            PillButton(title: L("Обновить до %@", v)) { updater.update() }
         case .downloading(let p):
             HStack(spacing: 8) {
                 ProgressBar(progress: p).frame(width: 110, height: 6)
-                Text(p.map { "\(Int(($0 * 100).rounded()))%" } ?? "Скачиваю")
+                Text(p.map { "\(Int(($0 * 100).rounded()))%" } ?? L("Скачиваю"))
                     .font(.system(size: 11, weight: .semibold).monospacedDigit())
                     .foregroundStyle(Color.white.opacity(0.7))
             }
@@ -53,7 +53,7 @@ struct UpdateStatus: View {
             busy("Устанавливаю")
         case .failed(let message):
             HStack(spacing: 8) {
-                Text("Не удалось").font(.system(size: 11, weight: .semibold)).foregroundStyle(Theme.danger)
+                Text(L("Не удалось")).font(.system(size: 11, weight: .semibold)).foregroundStyle(Theme.danger)
                     .help(message)
                 PillButton(title: "Ещё раз") { updater.update() }
             }
@@ -63,7 +63,7 @@ struct UpdateStatus: View {
     func busy(_ text: String) -> some View {
         HStack(spacing: 6) {
             ProgressView().controlSize(.small).scaleEffect(0.7).frame(width: 14, height: 14)
-            Text(text).font(.system(size: 11, weight: .semibold)).foregroundStyle(Color.white.opacity(0.7))
+            Text(L(text)).font(.system(size: 11, weight: .semibold)).foregroundStyle(Color.white.opacity(0.7))
         }
     }
 }
@@ -81,7 +81,7 @@ struct GreenButton: View {
         Button(action: action) {
             HStack(spacing: 6) {
                 Image(systemName: icon).font(.system(size: 12, weight: .bold))
-                Text(title).font(.system(size: 12, weight: .semibold))
+                Text(L(title)).font(.system(size: 12, weight: .semibold))
             }
             .foregroundStyle(Color.black.opacity(0.85))
             .padding(.horizontal, 14)
@@ -91,8 +91,8 @@ struct GreenButton: View {
         }
         .buttonStyle(.plain)
         .onHover { hover = $0 }
-        .help(help)
-        .accessibilityLabel(title)
+        .help(L(help))
+        .accessibilityLabel(L(title))
     }
 }
 
@@ -105,7 +105,7 @@ struct ProgressCapsule: View {
 
     var body: some View {
         HStack(spacing: 6) {
-            Text(title)
+            Text(L(title))
             if let progress { Text("\(Int((progress * 100).rounded()))%").monospacedDigit() }
         }
         .font(.system(size: 12, weight: .semibold))

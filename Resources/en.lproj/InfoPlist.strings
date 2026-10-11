@@ -1,0 +1,4 @@
+/* Пояснения в окнах доступа macOS — на английском */
+"NSDesktopFolderUsageDescription" = "Needed to show your recent screenshots.";
+"NSDocumentsFolderUsageDescription" = "Needed to show your recent screenshots.";
+"NSDownloadsFolderUsageDescription" = "Needed to show your recent screenshots.";

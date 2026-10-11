@@ -6,22 +6,22 @@ enum ClaudeWidget: String, CaseIterable, Identifiable {
     var id: String { rawValue }
     var title: String {
         switch self {
-        case .session: return "Сессия · 5 ч"
-        case .week: return "Неделя"
+        case .session: return L("Сессия · 5 ч")
+        case .week: return L("Неделя")
         }
     }
     /// Какое это окно — в настройках
     var short: String {
         switch self {
-        case .session: return "5 часов"
-        case .week: return "неделя"
+        case .session: return L("5 часов")
+        case .week: return L("неделя")
         }
     }
     /// То же коротко — в строке меню
     var menuBarLabel: String {
         switch self {
-        case .session: return "5 ч"
-        case .week: return "Нед"
+        case .session: return L("5 ч")
+        case .week: return L("Нед")
         }
     }
 }

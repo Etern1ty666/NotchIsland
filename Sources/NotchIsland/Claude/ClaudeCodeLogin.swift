@@ -71,7 +71,7 @@ enum ClaudeCodeLogin {
         let json = (try? JSONSerialization.jsonObject(with: data)) as? [String: Any] ?? [:]
         guard status == 200, let access = json["access_token"] as? String else {
             if (400..<500).contains(status) { throw RefreshError.expired }
-            throw RefreshError.network("Не удалось обновить вход (HTTP \(status))")
+            throw RefreshError.network(L("Не удалось обновить вход (HTTP %@)", String(status)))
         }
         var oauth = c.oauth
         oauth["accessToken"] = access

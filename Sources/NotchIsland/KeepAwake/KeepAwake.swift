@@ -52,22 +52,22 @@ final class KeepAwake: NSObject, ObservableObject {
     }
 
     /// Название режима — в меню и подсказках
-    static let title = "Держать экран включенным"
+    static var title: String { L("Держать экран включенным") }
 
     /// «Экран не гаснет ещё 1 ч 12 мин»; без срока — просто название режима
     var statusText: String {
         guard active, let until else { return Self.title }
         let m = max(1, Int((until.timeIntervalSinceNow / 60).rounded(.up)))
-        return "Экран не гаснет ещё \(formatMinutes(m))"
+        return L("Экран не гаснет ещё %@", formatMinutes(m))
     }
 
     /// Сколько осталось — одной единицей для строки меню: «3ч», «25м», «40с».
     /// Округляем вверх: «25м» — осталось не больше 25 минут
     static func shortRemaining(until: Date, now: Date = Date()) -> String {
         let s = max(0, until.timeIntervalSince(now))
-        if s > 3600 { return "\(Int((s / 3600).rounded(.up)))ч" }
-        if s > 60 { return "\(Int((s / 60).rounded(.up)))м" }
-        return "\(Int(s.rounded(.up)))с"
+        if s > 3600 { return "\(Int((s / 3600).rounded(.up)))" + L("ч") }
+        if s > 60 { return "\(Int((s / 60).rounded(.up)))" + L("м") }
+        return "\(Int(s.rounded(.up)))" + L("с")
     }
 
     /// Меню сроков — одно и то же у кнопки на острове и в строке меню.
@@ -89,7 +89,7 @@ final class KeepAwake: NSObject, ObservableObject {
             menu.addItem(.separator())
         }
         for (i, o) in Self.options.enumerated() {
-            let item = NSMenuItem(title: o.title, action: #selector(pick(_:)), keyEquivalent: "")
+            let item = NSMenuItem(title: L(o.title), action: #selector(pick(_:)), keyEquivalent: "")
             item.target = self
             item.tag = i
             item.state = active && chosen == i ? .on : .off
@@ -97,7 +97,7 @@ final class KeepAwake: NSObject, ObservableObject {
         }
         if active {
             menu.addItem(.separator())
-            let off = NSMenuItem(title: "Выключить", action: #selector(turnOff), keyEquivalent: "")
+            let off = NSMenuItem(title: L("Выключить"), action: #selector(turnOff), keyEquivalent: "")
             off.target = self
             menu.addItem(off)
         }

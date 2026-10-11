@@ -226,19 +226,19 @@ final class SystemStats: ObservableObject {
     /// Одна строка для подсказки у значка в строке меню
     func summary(_ s: Stat) -> String {
         switch s {
-        case .cpu: return "Процессор \(pct(cpu)): пользователь \(pct(cpuUser)), система \(pct(cpuSystem))"
-        case .memory: return "Память: занято \(formatBytes(memUsed, binary: true)) из \(formatBytes(memTotal, binary: true))"
-        case .network: return "Сеть: ↓ \(formatSpeed(netIn)), ↑ \(formatSpeed(netOut))"
-        case .disk: return "Диск: свободно \(formatBytes(diskFree)) из \(formatBytes(diskTotal))"
-        case .battery: return "Батарея \(pct(battery?.level ?? 0)) · \(batteryState)"
+        case .cpu: return L("Процессор %@: пользователь %@, система %@", pct(cpu), pct(cpuUser), pct(cpuSystem))
+        case .memory: return L("Память: занято %@ из %@", formatBytes(memUsed, binary: true), formatBytes(memTotal, binary: true))
+        case .network: return L("Сеть: ↓ %@, ↑ %@", formatSpeed(netIn), formatSpeed(netOut))
+        case .disk: return L("Диск: свободно %@ из %@", formatBytes(diskFree), formatBytes(diskTotal))
+        case .battery: return L("Батарея %@ · %@", pct(battery?.level ?? 0), batteryState)
         }
     }
 
     /// «Заряжается · до полной 40 мин», «От батареи · осталось 3 ч 10 мин»
     var batteryState: String {
         guard let b = battery else { return "" }
-        if b.charging { return "Заряжается" + (b.minutesLeft.map { " · до полной \(formatMinutes($0))" } ?? "") }
-        if b.onAC { return "От сети" }
-        return "От батареи" + (b.minutesLeft.map { " · осталось \(formatMinutes($0))" } ?? "")
+        if b.charging { return L("Заряжается") + (b.minutesLeft.map { " · " + L("до полной %@", formatMinutes($0)) } ?? "") }
+        if b.onAC { return L("От сети") }
+        return L("От батареи") + (b.minutesLeft.map { " · " + L("осталось %@", formatMinutes($0)) } ?? "")
     }
 }

@@ -8,47 +8,43 @@ func formatBytes(_ b: Double, binary: Bool = false) -> String {
     return p.number + " " + p.unit
 }
 
-/// Число и единица отдельно — чтобы выровнять их колонками: («9,8», «ГБ»)
+/// Число и единица отдельно — чтобы выровнять их колонками: («9,8», «ГБ»).
+/// Единицы и десятичный знак — по языку интерфейса
 func bytesParts(_ b: Double, binary: Bool = false) -> (number: String, unit: String) {
     let k: Double = binary ? 1024 : 1000
-    let units = ["Б", "КБ", "МБ", "ГБ", "ТБ"]
+    let units = ["Б", "КБ", "МБ", "ГБ", "ТБ"].map(L)
     var v = max(0, b), i = 0
     while v >= k && i < units.count - 1 { v /= k; i += 1 }
     let s = i >= 2 && v < 100 ? String(format: "%.1f", v) : String(format: "%.0f", v)
-    return (s.replacingOccurrences(of: ".", with: ","), units[i])
+    return (Localizer.shared.isRussian ? s.replacingOccurrences(of: ".", with: ",") : s, units[i])
 }
 
-func formatSpeed(_ b: Double) -> String { formatBytes(b) + "/с" }
+func formatSpeed(_ b: Double) -> String { formatBytes(b) + L("/с") }
 
 /// Коротко для строки меню: «45м», «2ч 10м», «3д 4ч»
 func shortDuration(minutes m: Int) -> String {
     let m = max(0, m)
-    if m < 60 { return "\(m)м" }
-    if m < 24 * 60 { return "\(m / 60)ч" + (m % 60 > 0 ? " \(m % 60)м" : "") }
+    let min = L("м"), hour = L("ч"), day = L("д")
+    if m < 60 { return "\(m)\(min)" }
+    if m < 24 * 60 { return "\(m / 60)\(hour)" + (m % 60 > 0 ? " \(m % 60)\(min)" : "") }
     let h = (m % (24 * 60)) / 60
-    return "\(m / (24 * 60))д" + (h > 0 ? " \(h)ч" : "")
+    return "\(m / (24 * 60))\(day)" + (h > 0 ? " \(h)\(hour)" : "")
 }
 
 /// 25 мин, 1 ч 12 мин
 func formatMinutes(_ m: Int) -> String {
-    m < 60 ? "\(m) мин" : "\(m / 60) ч" + (m % 60 > 0 ? " \(m % 60) мин" : "")
+    let min = L("мин"), hour = L("ч")
+    return m < 60 ? "\(m) \(min)" : "\(m / 60) \(hour)" + (m % 60 > 0 ? " \(m % 60) \(min)" : "")
 }
 
+/// Сколько прошло: «сейчас», «40 с», «5 мин», «2 ч», «3 д»
 func relativeTime(_ d: Date) -> String {
     let s = Int(Date().timeIntervalSince(d))
-    if s < 10 { return "сейчас" }
-    if s < 60 { return "\(s) с" }
-    if s < 3600 { return "\(s / 60) мин" }
-    if s < 86400 { return "\(s / 3600) ч" }
-    return "\(s / 86400) д"
-}
-
-/// 1 запись, 2 записи, 5 записей
-func plural(_ n: Int, _ one: String, _ few: String, _ many: String) -> String {
-    let n10 = n % 10, n100 = n % 100
-    if n10 == 1 && n100 != 11 { return one }
-    if (2...4).contains(n10) && !(12...14).contains(n100) { return few }
-    return many
+    if s < 10 { return L("сейчас") }
+    if s < 60 { return "\(s) \(L("с"))" }
+    if s < 3600 { return "\(s / 60) \(L("мин"))" }
+    if s < 86400 { return "\(s / 3600) \(L("ч"))" }
+    return "\(s / 86400) \(L("д"))"
 }
 
 /// ISO 8601 с долями секунды любой длины («2026-10-11T04:59:59.943648+00:00») и без них
@@ -61,16 +57,16 @@ func parseISODate(_ s: String) -> Date? {
     return f.date(from: trimmed)
 }
 
-/// «через 2 ч 10 мин» / «в пн 14:00»
+/// «сброс через 2 ч 10 мин» / «сброс в пн 14:00»
 func resetText(_ d: Date?) -> String {
-    guard let d else { return "окно ещё не началось" }
+    guard let d else { return L("окно ещё не началось") }
     let m = Int((d.timeIntervalSinceNow / 60).rounded(.up))
-    if m <= 0 { return "окно обновилось" }
-    if m < 24 * 60 { return "сброс через \(formatMinutes(m))" }
+    if m <= 0 { return L("окно обновилось") }
+    if m < 24 * 60 { return L("сброс через %@", formatMinutes(m)) }
     let f = DateFormatter()
-    f.locale = Locale(identifier: "ru_RU")
+    f.locale = Localizer.shared.locale
     f.dateFormat = "EE HH:mm"
-    return "сброс в \(f.string(from: d).lowercased())"
+    return L("сброс в %@", f.string(from: d).lowercased())
 }
 
 extension String {
@@ -81,8 +77,8 @@ extension String {
 /// «обновлено 5 мин назад»
 func agoText(_ d: Date) -> String {
     let m = Int(-d.timeIntervalSinceNow / 60)
-    if m < 1 { return "только что" }
-    if m < 60 { return "\(m) мин назад" }
-    if m < 24 * 60 { return "\(m / 60) ч назад" }
-    return "\(m / (24 * 60)) д назад"
+    if m < 1 { return L("только что") }
+    if m < 60 { return L("%@ мин назад", String(m)) }
+    if m < 24 * 60 { return L("%@ ч назад", String(m / 60)) }
+    return L("%@ д назад", String(m / (24 * 60)))
 }

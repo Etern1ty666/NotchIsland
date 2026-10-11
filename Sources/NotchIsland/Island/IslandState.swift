@@ -38,8 +38,8 @@ enum Tab: String, CaseIterable {
     case clipboard, stats
     var title: String {
         switch self {
-        case .clipboard: return "Буфер"
-        case .stats: return "Статистика"
+        case .clipboard: return L("Буфер")
+        case .stats: return L("Статистика")
         }
     }
 }

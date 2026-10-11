@@ -12,9 +12,9 @@ enum ClipRetention: Int, CaseIterable, Identifiable {
     var id: Int { rawValue }
     var title: String {
         switch self {
-        case .hour: return "1 час"
-        case .day: return "1 день"
-        case .forever: return "Всегда"
+        case .hour: return L("1 час")
+        case .day: return L("1 день")
+        case .forever: return L("Всегда")
         }
     }
 }

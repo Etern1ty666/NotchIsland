@@ -45,7 +45,7 @@ struct SettingsView: View {
                         .disabled(!loginItem.available)
                         .opacity(loginItem.available ? 1 : 0.5)
                 }
-                SettingsRow(icon: "arrow.down.circle", title: "Версия \(Updater.currentVersion)") {
+                SettingsRow(icon: "arrow.down.circle", title: L("Версия %@", Updater.currentVersion)) {
                     UpdateStatus(updater: updater)
                 }
             }
@@ -80,7 +80,7 @@ struct SettingsView: View {
                 MenuBarToggle(icon: "switch.2", title: "NotchIsland", isOn: statsSettings.showAppIcon) {
                     statsSettings.showAppIcon.toggle()
                 }
-                .help("Значок приложения — когда других значков нет")
+                .help(L("Значок приложения — когда других значков нет"))
             }
         }
     }
@@ -124,16 +124,16 @@ struct SettingsView: View {
 
     /// Состояние — в подсказке при наведении на строку
     var loginStatus: String {
-        if !usage.accountEnabled { return "Отключено — лимиты не запрашиваются" }
+        if !usage.accountEnabled { return L("Отключено — лимиты не запрашиваются") }
         if !usage.loggedIn || usage.authLost {
             switch usage.login {
-            case .idle: return usage.authLost ? (usage.apiError ?? "Вход пропал — нужно войти заново") : "Вход не выполнен"
-            case .waiting: return "Жду вход в браузере"
+            case .idle: return usage.authLost ? (usage.apiError ?? L("Вход пропал — нужно войти заново")) : L("Вход не выполнен")
+            case .waiting: return L("Жду вход в браузере")
             case .failed(let m): return m
             }
         }
         if let e = usage.apiError { return e }
-        return usage.updatedAt.map { "Вход выполнен · обновлено " + agoText($0) } ?? "Проверяю"
+        return usage.updatedAt.map { L("Вход выполнен · обновлено %@", agoText($0)) } ?? L("Проверяю")
     }
     /// Красный — только когда вход пропал; временные сбои сервера и сети значок не трогают
     var loginIcon: String {
@@ -160,7 +160,7 @@ struct SettingsRow<Accessory: View>: View {
     var body: some View {
         HStack(spacing: 8) {
             Image(systemName: icon).foregroundStyle(iconColor).frame(width: 18)
-            Text(title).font(.system(size: 12, weight: .semibold)).lineLimit(1)
+            Text(L(title)).font(.system(size: 12, weight: .semibold)).lineLimit(1)
             Spacer(minLength: 0)
             // кнопки и переключатели — всегда своей полной ширины, сжимается название
             accessory().fixedSize()
@@ -168,7 +168,7 @@ struct SettingsRow<Accessory: View>: View {
         .padding(.horizontal, 10)
         .frame(height: 44)
         .cardBackground()
-        .help(help ?? "")
+        .help(L(help ?? ""))
     }
 }
 
@@ -184,7 +184,7 @@ struct MenuBarToggle: View {
         Button(action: action) {
             HStack(spacing: 6) {
                 Image(systemName: icon).font(.system(size: 11, weight: .semibold)).frame(width: 14)
-                Text(title).font(.system(size: 11, weight: .semibold)).lineLimit(1)
+                Text(L(title)).font(.system(size: 11, weight: .semibold)).lineLimit(1)
             }
             .foregroundStyle(Color.white.opacity(isOn ? 1 : (hover ? 0.7 : 0.4)))
             .frame(maxWidth: .infinity)
@@ -197,7 +197,7 @@ struct MenuBarToggle: View {
         }
         .buttonStyle(.plain)
         .onHover { hover = $0 }
-        .help(isOn ? "Показывается в строке меню. Нажатие — спрятать" : "Нажатие — показывать в строке меню")
+        .help(isOn ? L("Показывается в строке меню. Нажатие — спрятать") : L("Нажатие — показывать в строке меню"))
         .accessibilityAddTraits(isOn ? .isSelected : [])
     }
 }

@@ -55,7 +55,7 @@ struct ClipboardTab: View {
             Image(systemName: "camera.viewfinder")
                 .font(.system(size: 12, weight: .semibold))
                 .foregroundStyle(Theme.warning)
-            Text("Скриншоты не видны — нет доступа к папке «\(clip.screenshotFolderName)»")
+            Text(L("Скриншоты не видны — нет доступа к папке «%@»", clip.screenshotFolderName))
                 .font(.system(size: 12))
                 .lineLimit(2)
             Spacer(minLength: 0)

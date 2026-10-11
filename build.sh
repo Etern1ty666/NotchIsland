@@ -30,6 +30,7 @@ build() {
   cp "$bin" "$APP/Contents/MacOS/NotchIsland"
   cp Resources/Info.plist "$APP/Contents/Info.plist"
   cp Resources/AppIcon.icns "$APP/Contents/Resources/AppIcon.icns"
+  cp -R Resources/*.lproj "$APP/Contents/Resources/"   # переводы и пояснения для окон доступа
   ditto "$SPARKLE/Sparkle.xcframework/macos-arm64_x86_64/Sparkle.framework" "$APP/Contents/Frameworks/Sparkle.framework"
   chmod -R u+rwX,go+rX "$APP"   # файлы приложения читают все пользователи Mac
   codesign --force --deep --sign - "$APP"   # ad-hoc подпись, достаточно для локального использования

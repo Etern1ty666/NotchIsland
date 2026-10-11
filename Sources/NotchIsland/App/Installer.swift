@@ -11,10 +11,10 @@ enum Installer {
 
         NSApp.activate(ignoringOtherApps: true)
         let alert = NSAlert()
-        alert.messageText = "Установить NotchIsland в «Программы»?"
-        alert.informativeText = "Приложение будет скопировано в /Applications и добавлено в автозапуск. Автозапуск можно отключить в меню иконки в строке меню."
-        alert.addButton(withTitle: "Установить")
-        alert.addButton(withTitle: "Не сейчас")
+        alert.messageText = L("Установить NotchIsland в «Программы»?")
+        alert.informativeText = L("Приложение будет скопировано в /Applications и добавлено в автозапуск. Автозапуск можно отключить в меню иконки в строке меню.")
+        alert.addButton(withTitle: L("Установить"))
+        alert.addButton(withTitle: L("Не сейчас"))
         guard alert.runModal() == .alertFirstButtonReturn else { return true }
 
         let dest = URL(fileURLWithPath: "/Applications/NotchIsland.app")
@@ -25,7 +25,7 @@ enum Installer {
             try FileManager.default.copyItem(at: Bundle.main.bundleURL, to: dest)
         } catch {
             let err = NSAlert()
-            err.messageText = "Не удалось установить"
+            err.messageText = L("Не удалось установить")
             err.informativeText = error.localizedDescription
             err.runModal()
             return true

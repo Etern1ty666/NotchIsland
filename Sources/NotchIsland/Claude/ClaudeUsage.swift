@@ -108,10 +108,10 @@ final class ClaudeUsage: ObservableObject {
 
     /// Подсказка при наведении на «таблетку» в строке меню
     func summary(_ w: ClaudeWidget) -> String {
-        if needsAccount { return "Claude · \(w.title): аккаунт не подключён" }
-        guard let win = window(w) else { return "Claude · \(w.title): нет данных" }
-        let spent = (win.spent * 100).rounded() > 0 ? "израсходовано \(pct(win.spent))" : "лимит не тронут (0%)"
-        return "Claude · \(w.title): \(spent), \(resetText(win.resetsAt))"
+        if needsAccount { return L("Claude · %@: аккаунт не подключён", w.title) }
+        guard let win = window(w) else { return L("Claude · %@: нет данных", w.title) }
+        let spent = (win.spent * 100).rounded() > 0 ? L("израсходовано %@", pct(win.spent)) : L("лимит не тронут (0%)")
+        return L("Claude · %@: %@, %@", w.title, spent, resetText(win.resetsAt))
     }
 
     /// Кнопка «обновить» на вкладке статистики
@@ -146,7 +146,7 @@ final class ClaudeUsage: ObservableObject {
             switch status {
             case 200:
                 let five = Self.window(json["five_hour"]), seven = Self.window(json["seven_day"])
-                guard five != nil || seven != nil else { apiError = "Сервер не прислал лимиты"; return }
+                guard five != nil || seven != nil else { apiError = L("Сервер не прислал лимиты"); return }
                 apply(five, seven, at: Date())
                 apiError = nil
                 authLost = false
@@ -156,23 +156,23 @@ final class ClaudeUsage: ObservableObject {
                 let wait = max(retry ?? 0, 300)
                 nextFetch = Date().addingTimeInterval(wait)
                 waitUntil = nextFetch
-                apiError = "Повтор через \(formatMinutes(Int(wait / 60)))"
+                apiError = L("Повтор через %@", formatMinutes(Int(wait / 60)))
             case 401, 403:
                 blockedToken = creds.accessToken
                 authLost = true
-                apiError = "Вход больше не действует"
+                apiError = L("Вход больше не действует")
             default:
-                apiError = ((json["error"] as? [String: Any])?["message"] as? String) ?? "Ошибка сервера (HTTP \(status))"
+                apiError = ((json["error"] as? [String: Any])?["message"] as? String) ?? L("Ошибка сервера (HTTP %@)", String(status))
             }
         } catch ClaudeCodeLogin.RefreshError.expired {
             authLost = true
-            apiError = "Вход устарел, нужно войти заново"
+            apiError = L("Вход устарел, нужно войти заново")
         } catch ClaudeCodeLogin.RefreshError.network(let m) {
             apiError = m
         } catch let e as URLError where e.code == .timedOut || e.code == .cannotConnectToHost {
-            apiError = "Сервер не отвечает"
+            apiError = L("Сервер не отвечает")
         } catch is URLError {
-            apiError = "Нет сети"
+            apiError = L("Нет сети")
         } catch {
             apiError = error.localizedDescription
         }
@@ -204,7 +204,7 @@ final class ClaudeUsage: ObservableObject {
     /// Запускаем вход в фоне: Claude Code сам откроет браузер и сохранит вход в связку ключей
     func startLogin() {
         guard let bin = Self.findClaude() else {
-            login = .failed("Claude Code не установлен — нужен для входа")
+            login = .failed(L("Claude Code не установлен — нужен для входа"))
             return
         }
         loginProcess?.terminate()
@@ -239,7 +239,7 @@ final class ClaudeUsage: ObservableObject {
                 p.terminate()
             }
         } catch {
-            login = .failed("Не удалось запустить вход: \(error.localizedDescription)")
+            login = .failed(L("Не удалось запустить вход: %@", error.localizedDescription))
         }
     }
 
@@ -250,7 +250,7 @@ final class ClaudeUsage: ObservableObject {
             finishLogin()
             fetchNow()
         } else {
-            login = .failed("Вход не завершён — можно повторить или войти через Терминал")
+            login = .failed(L("Вход не завершён — можно повторить или войти через Терминал"))
         }
     }
 
@@ -269,7 +269,7 @@ final class ClaudeUsage: ObservableObject {
     /// Запасной путь: та же команда в окне Терминала (если вход попросит что-то ввести)
     func loginInTerminal() {
         let bin = Self.findClaude()?.path ?? "claude"
-        let script = "#!/bin/zsh\n\"\(bin)\" auth login --claudeai\necho\necho 'Готово — окно можно закрыть.'\n"
+        let script = "#!/bin/zsh\n\"\(bin)\" auth login --claudeai\necho\necho '\(L("Готово — окно можно закрыть."))'\n"
         let url = AppPaths.support.appendingPathComponent("claude-login.command")
         do {
             try FileManager.default.createDirectory(at: AppPaths.support, withIntermediateDirectories: true)

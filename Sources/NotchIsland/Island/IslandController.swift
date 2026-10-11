@@ -39,9 +39,12 @@ final class IslandController: NSObject {
         }
         panel.acceptsMouseMovedEvents = true
 
-        let host = NSHostingView(rootView: IslandView(state: state, clip: clip, awake: awake,
-                                                     stats: stats, statsSettings: statsSettings, usage: usage,
-                                                     updater: updater))
+        // корень на языке системы: сменили язык — остров строится заново на новом
+        let state = self.state, clip = self.clip, awake = self.awake
+        let host = NSHostingView(rootView: LocalizedRoot {
+            IslandView(state: state, clip: clip, awake: awake,
+                       stats: stats, statsSettings: statsSettings, usage: usage, updater: updater)
+        })
         host.sizingOptions = []
         if #available(macOS 13.3, *) { host.safeAreaRegions = [] }
         panel.contentView = host
@@ -205,6 +208,7 @@ final class IslandController: NSObject {
         collapseWork?.cancel()
         collapseWork = nil
         guard !state.expanded else { return }
+        Localizer.shared.refresh()
         // остров всегда открывается на буфере; заодно подхватываем свежие скриншоты
         state.tab = .clipboard
         clip.scanScreenshots()

@@ -6,7 +6,7 @@ struct SectionHeader: View {
 
     var body: some View {
         HStack(spacing: 5) {
-            Text(title)
+            Text(L(title))
             Image(systemName: icon)
         }
         .font(.system(size: 11, weight: .semibold))
@@ -82,7 +82,7 @@ struct CardLayout<Value: View>: View {
 
     private var pinHint: String? {
         guard onTap == nil, let pinned else { return nil }
-        return pinned ? "Нажатие — убрать из строки меню" : "Нажатие — показывать в строке меню"
+        return pinned ? L("Нажатие — убрать из строки меню") : L("Нажатие — показывать в строке меню")
     }
 
     private var helpText: String {

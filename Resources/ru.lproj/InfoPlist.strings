@@ -1,0 +1,4 @@
+/* Пояснения в окнах доступа macOS — на русском */
+"NSDesktopFolderUsageDescription" = "Нужен, чтобы показывать последние скриншоты.";
+"NSDocumentsFolderUsageDescription" = "Нужен, чтобы показывать последние скриншоты.";
+"NSDownloadsFolderUsageDescription" = "Нужен, чтобы показывать последние скриншоты.";

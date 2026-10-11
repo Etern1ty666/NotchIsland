@@ -21,7 +21,7 @@ struct StatsTab: View {
                 HStack(spacing: 6) {
                     SectionHeader(icon: "sparkles", title: "Claude")
                     if let d = usage.updatedAt {
-                        Text("обновлено " + agoText(d))
+                        Text(L("обновлено %@", agoText(d)))
                             .font(.system(size: 10))
                             .foregroundStyle(Color.white.opacity(0.35))
                     }
@@ -57,19 +57,19 @@ struct StatCard: View {
     @ViewBuilder var value: some View {
         switch stat {
         case .cpu: percentText(stats.cpu, size: 20)
-        case .memory: valueText(formatBytes(stats.memUsed, binary: true), " из \(formatBytes(stats.memTotal, binary: true))")
+        case .memory: valueText(formatBytes(stats.memUsed, binary: true), " " + L("из %@", formatBytes(stats.memTotal, binary: true)))
         case .network: valueText("↓ " + formatSpeed(stats.netIn))
-        case .disk: valueText(formatBytes(stats.diskFree), " свободно")
+        case .disk: valueText(formatBytes(stats.diskFree), " " + L("свободно"))
         case .battery: percentText(stats.battery?.level ?? 0, size: 20, warn: false)
         }
     }
 
     var detail: String {
         switch stat {
-        case .cpu: return "Пользователь \(pct(stats.cpuUser)) · система \(pct(stats.cpuSystem))"
-        case .memory: return "Занято \(pct(stats.memFraction))"
+        case .cpu: return L("Пользователь %@ · система %@", pct(stats.cpuUser), pct(stats.cpuSystem))
+        case .memory: return L("Занято %@", pct(stats.memFraction))
         case .network: return "↑ " + formatSpeed(stats.netOut)
-        case .disk: return "Занято \(pct(stats.diskUsedFraction)) из \(formatBytes(stats.diskTotal))"
+        case .disk: return L("Занято %@ из %@", pct(stats.diskUsedFraction), formatBytes(stats.diskTotal))
         case .battery: return stats.batteryState
         }
     }

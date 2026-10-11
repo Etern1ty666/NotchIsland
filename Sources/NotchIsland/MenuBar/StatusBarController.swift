@@ -61,6 +61,15 @@ final class StatusBarController: NSObject, NSMenuDelegate {
             .receive(on: DispatchQueue.main)
             .sink { [weak self] _ in self?.updateStatusItems() }
             .store(in: &bag)
+        // сменили язык системы — значки заново: другие подписи и ширина
+        Localizer.shared.$language
+            .dropFirst()
+            .receive(on: DispatchQueue.main)
+            .sink { [weak self] _ in
+                self?.shown = []
+                self?.updateStatusItems()
+            }
+            .store(in: &bag)
         // каждый замер: подсказки при наведении и ширина значков (только растёт — без дёрганья соседей)
         stats.$cpu
             .receive(on: DispatchQueue.main)

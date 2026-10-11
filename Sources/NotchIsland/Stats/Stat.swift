@@ -6,11 +6,11 @@ enum Stat: String, CaseIterable, Identifiable {
     var id: String { rawValue }
     var title: String {
         switch self {
-        case .cpu: return "Процессор"
-        case .memory: return "Память"
-        case .network: return "Сеть"
-        case .disk: return "Диск"
-        case .battery: return "Батарея"
+        case .cpu: return L("Процессор")
+        case .memory: return L("Память")
+        case .network: return L("Сеть")
+        case .disk: return L("Диск")
+        case .battery: return L("Батарея")
         }
     }
 }

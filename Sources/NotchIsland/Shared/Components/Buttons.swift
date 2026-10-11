@@ -19,8 +19,8 @@ struct CircleIconButton: View {
         }
         .buttonStyle(.plain)
         .onHover { hover = $0 }
-        .help(help)
-        .accessibilityLabel(help)
+        .help(L(help))
+        .accessibilityLabel(L(help))
     }
 }
 
@@ -33,7 +33,7 @@ struct PillButton: View {
 
     var body: some View {
         Button(action: action) {
-            Text(title)
+            Text(L(title))
                 .font(.system(size: 11, weight: .semibold))
                 .foregroundStyle(destructive ? Theme.danger : Color.white)
                 .padding(.horizontal, 10)
@@ -69,8 +69,8 @@ struct RefreshButton: View {
         .buttonStyle(.plain)
         .disabled(busy)
         .onHover { hover = $0 }
-        .help("Обновить")
-        .accessibilityLabel("Обновить")
+        .help(L("Обновить"))
+        .accessibilityLabel(L("Обновить"))
     }
 }
 
@@ -98,7 +98,7 @@ struct SegmentButton: View {
 
     var body: some View {
         Button(action: action) {
-            Text(title)
+            Text(L(title))
                 .font(.system(size: 11, weight: .semibold))
                 .foregroundStyle(Color.white.opacity(selected ? 1 : (hover ? 0.85 : 0.55)))
                 .padding(.horizontal, 10)

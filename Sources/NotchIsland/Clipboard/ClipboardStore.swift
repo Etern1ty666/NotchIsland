@@ -168,9 +168,9 @@ final class ClipboardStore: ObservableObject {
     var screenshotFolderName: String {
         let dir = Self.screenshotDir()
         switch Self.privacyService(for: dir) {
-        case "SystemPolicyDesktopFolder": return "Рабочий стол"
-        case "SystemPolicyDocumentsFolder": return "Документы"
-        case "SystemPolicyDownloadsFolder": return "Загрузки"
+        case "SystemPolicyDesktopFolder": return L("Рабочий стол")
+        case "SystemPolicyDocumentsFolder": return L("Документы")
+        case "SystemPolicyDownloadsFolder": return L("Загрузки")
         default: return FileManager.default.displayName(atPath: dir.path)
         }
     }

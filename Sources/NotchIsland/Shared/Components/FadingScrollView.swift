@@ -47,8 +47,8 @@ struct FadingScrollView<Content: View>: View {
                         }
                         .buttonStyle(.plain)
                         .onHover { hover = $0 }
-                        .help("Ниже есть ещё")
-                        .accessibilityLabel("Прокрутить вниз")
+                        .help(L("Ниже есть ещё"))
+                        .accessibilityLabel(L("Прокрутить вниз"))
                         .transition(.opacity)
                     }
                 }

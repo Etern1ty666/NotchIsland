@@ -45,12 +45,12 @@ struct MenuBarStat: View {
                 GridRow {
                     Text("↑")
                     Text(up.number).gridColumnAlignment(.trailing)
-                    Text(up.unit + "/с")
+                    Text(up.unit + L("/с"))
                 }
                 GridRow {
                     Text("↓")
                     Text(down.number)
-                    Text(down.unit + "/с")
+                    Text(down.unit + L("/с"))
                 }
             }
             .font(.system(size: 9, weight: .semibold, design: .rounded).monospacedDigit())
@@ -129,7 +129,7 @@ struct MenuBarClaude: View {
         HStack(spacing: 5) {
             if usage.needsAccount {
                 // аккаунта нет — только приглашение подключить
-                Text("Подключите Claude")
+                Text(L("Подключите Claude"))
                     .font(.system(size: 11, weight: .semibold, design: .rounded))
                     .foregroundStyle(Color.white.opacity(0.75))
                 sparkles
@@ -162,8 +162,8 @@ struct MenuBarClaude: View {
 
     /// Сколько до сброса: «2ч 10м», «3д 4ч»
     func resetShort(_ w: UsageWindow) -> String {
-        guard let reset = w.resetsAt else { return "не начато" }
-        if w.isReset { return "сейчас" }
+        guard let reset = w.resetsAt else { return L("не начато") }
+        if w.isReset { return L("сейчас") }
         return shortDuration(minutes: Int((reset.timeIntervalSinceNow / 60).rounded(.up)))
     }
 }
@@ -185,7 +185,7 @@ struct MenuBarAwake: View {
             if let until = awake.until {
                 TimelineView(.periodic(from: .now, by: 1)) { context in
                     ZStack(alignment: .leading) {
-                        ForEach(["88ч", "88м", "88с"], id: \.self) { Text($0).hidden() }
+                        ForEach(["88" + L("ч"), "88" + L("м"), "88" + L("с")], id: \.self) { Text($0).hidden() }
                         Text(KeepAwake.shortRemaining(until: until, now: context.date))
                     }
                     .font(.system(size: 11, weight: .semibold, design: .rounded).monospacedDigit())

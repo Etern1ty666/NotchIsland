@@ -28,7 +28,7 @@ struct ClaudeWindowCard: View {
                    gauge: .bar(spent), detail: detail, pinned: pinned, onPin: onPin,
                    onTap: window == nil ? openSettings : nil) {
             if let window {
-                Text("\(percentText(window.spent, size: 20, warn: false, color: claudeNumberColor(window)))\(Text(" израсходовано").font(.system(size: 11, weight: .medium)).foregroundColor(.white.opacity(0.45)))")
+                Text("\(percentText(window.spent, size: 20, warn: false, color: claudeNumberColor(window)))\(Text(" " + L("израсходовано")).font(.system(size: 11, weight: .medium)).foregroundColor(.white.opacity(0.45)))")
             } else {
                 valueText("—")
             }
@@ -37,9 +37,9 @@ struct ClaudeWindowCard: View {
 
     var detail: String {
         guard let window else {
-            if !usage.accountEnabled { return "Аккаунт отключён — см. настройки" }
+            if !usage.accountEnabled { return L("Аккаунт отключён — см. настройки") }
             if let e = usage.apiError { return e }
-            return usage.loggedIn ? "Загружаю" : "Нужен вход в Claude Code — см. настройки"
+            return usage.loggedIn ? L("Загружаю") : L("Нужен вход в Claude Code — см. настройки")
         }
         return resetText(window.resetsAt).capitalizedFirst
     }

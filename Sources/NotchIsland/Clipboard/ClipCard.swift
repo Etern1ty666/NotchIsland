@@ -73,8 +73,8 @@ struct ClipActionButton: View {
         }
         .buttonStyle(.plain)
         .onHover { hover = $0 }
-        .help(help)
-        .accessibilityLabel(help)
+        .help(L(help))
+        .accessibilityLabel(L(help))
     }
 }
 
@@ -111,7 +111,7 @@ struct ClipCard: View {
     var helpText: String {
         switch item.kind {
         case .text: return String(item.text.prefix(500))
-        case .image: return "Картинка"
+        case .image: return L("Картинка")
         case .screenshot: return item.text
         case .files: return item.urls.map(\.path).joined(separator: "\n")
         }
@@ -152,7 +152,7 @@ struct ClipCard: View {
                     .truncationMode(item.kind == .files ? .middle : .tail)
                     .multilineTextAlignment(.leading)
                 if item.kind == .files && item.urls.count > 1 {
-                    Text("\(item.urls.count) \(plural(item.urls.count, "файл", "файла", "файлов"))")
+                    Text(countText(item.urls.count, ru: ("файл", "файла", "файлов"), en: ("file", "files")))
                         .font(.system(size: 10))
                         .foregroundStyle(Color.white.opacity(0.45))
                 }
@@ -173,7 +173,7 @@ struct ClipCard: View {
             // подложка ровно под то, что видно: в короткой карточке не закрывает текст целиком
             Group {
                 if copied {
-                    Text("Скопировано")
+                    Text(L("Скопировано"))
                         .font(.system(size: 10, weight: .semibold))
                         .foregroundStyle(Color.green)
                         .fixedSize()

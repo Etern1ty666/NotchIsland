@@ -12,6 +12,7 @@ extension StatusBarController {
 
     /// Содержимое собирается заново при каждом открытии
     func menuNeedsUpdate(_ menu: NSMenu) {
+        Localizer.shared.refresh()
         menu.removeAllItems()
         switch menuKinds[ObjectIdentifier(menu)] ?? .app {
         case .app:
@@ -31,6 +32,8 @@ extension StatusBarController {
         case .claude(let w):
             if usage.needsAccount {
                 _ = addItem(to: menu, "Подключить Claude", #selector(connectClaude))
+            } else if usage.window(w) == nil {
+                _ = addItem(to: menu, "Обновить", #selector(refreshClaude))
             }
             _ = addItem(to: menu, "Открыть лимиты на claude.ai", #selector(openClaudeUsage))
             let hide = addItem(to: menu, "Спрятать", #selector(toggleClaude(_:)))
@@ -38,12 +41,12 @@ extension StatusBarController {
         }
         if !menu.items.isEmpty { menu.addItem(.separator()) }
         _ = addItem(to: menu, "Настройки", #selector(showSettings))
-        menu.addItem(NSMenuItem(title: "Выйти из NotchIsland", action: #selector(NSApplication.terminate(_:)),
+        menu.addItem(NSMenuItem(title: L("Выйти из NotchIsland"), action: #selector(NSApplication.terminate(_:)),
                                 keyEquivalent: ""))
     }
 
     private func addItem(to menu: NSMenu, _ title: String, _ action: Selector) -> NSMenuItem {
-        let item = NSMenuItem(title: title, action: action, keyEquivalent: "")
+        let item = NSMenuItem(title: L(title), action: action, keyEquivalent: "")
         item.target = self
         menu.addItem(item)
         return item
@@ -64,6 +67,8 @@ extension StatusBarController {
     @objc func showSettings() { openSettings?() }
 
     @objc func hideAppIcon() { statsSettings.showAppIcon = false }
+
+    @objc func refreshClaude() { usage.refresh() }
 
     /// Включаем аккаунт или запускаем вход и показываем, как идёт подключение, — в настройках острова
     @objc func connectClaude() {
