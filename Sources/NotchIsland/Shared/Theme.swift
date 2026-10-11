@@ -10,6 +10,8 @@ enum Theme {
     /// Опасные действия и ошибки: «Отключить», «Отмена», предупреждения в настройках
     static let danger = Color(red: 1, green: 0.45, blue: 0.4)
     static let link = Color(red: 0.45, green: 0.7, blue: 1)
+    /// Включён режим «Держать экран включенным»
+    static let awake = Color.orange
     /// Подложка карточек и строк
     static let card = Color.white.opacity(0.07)
     /// Карточка без данных (нет входа или ещё не загрузилось)

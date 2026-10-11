@@ -51,36 +51,46 @@ final class KeepAwake: NSObject, ObservableObject {
         active = false
     }
 
-    /// Что именно делает режим: держит экран включённым, а с ним и Mac — без сна по бездействию
-    static let title = "Не гасить экран и не усыплять Mac"
+    /// Название режима — в меню и подсказках
+    static let title = "Держать экран включенным"
 
-    /// «Экран не гаснет и Mac не уснёт ещё 1 ч 12 мин»
+    /// «Экран не гаснет ещё 1 ч 12 мин»
     var statusText: String {
         guard active else { return Self.title }
-        guard let until else { return "Экран не гаснет и Mac не уснёт, пока не выключишь" }
+        guard let until else { return "Экран не гаснет, пока не выключишь" }
         let m = max(1, Int((until.timeIntervalSinceNow / 60).rounded(.up)))
-        return "Экран не гаснет и Mac не уснёт ещё \(formatMinutes(m))"
+        return "Экран не гаснет ещё \(formatMinutes(m))"
     }
 
-    /// Меню сроков — одно и то же у кнопки на острове и в строке меню
+    /// Сколько осталось — одной единицей для строки меню: «3ч», «25м», «40с».
+    /// Округляем вверх: «25м» — осталось не больше 25 минут
+    static func shortRemaining(until: Date, now: Date = Date()) -> String {
+        let s = max(0, until.timeIntervalSince(now))
+        if s > 3600 { return "\(Int((s / 3600).rounded(.up)))ч" }
+        if s > 60 { return "\(Int((s / 60).rounded(.up)))м" }
+        return "\(Int(s.rounded(.up)))с"
+    }
+
+    /// Меню сроков — одно и то же у кнопки на острове и в строке меню.
+    /// header — с названием режима (у кнопки zzz); в строке меню название уже у пункта-родителя
     func makeMenu(header: Bool) -> NSMenu {
         let menu = NSMenu()
         menu.autoenablesItems = false
-        if active || header {
-            let info = NSMenuItem(title: statusText, action: nil, keyEquivalent: "")
-            info.isEnabled = false
-            menu.addItem(info)
-            // режим не спасает от сна при закрытой крышке — предупреждаем честно
-            let note = NSMenuItem(title: "Mac не уснёт от бездействия. Закрытая крышка всё равно усыпит его",
-                                  action: nil, keyEquivalent: "")
-            note.isEnabled = false
-            note.attributedTitle = NSAttributedString(string: note.title, attributes: [
+        if header {
+            let title = NSMenuItem(title: Self.title, action: nil, keyEquivalent: "")
+            title.isEnabled = false
+            menu.addItem(title)
+        }
+        if active {
+            let status = NSMenuItem(title: statusText, action: nil, keyEquivalent: "")
+            status.isEnabled = false
+            status.attributedTitle = NSAttributedString(string: status.title, attributes: [
                 .font: NSFont.menuFont(ofSize: NSFont.smallSystemFontSize),
                 .foregroundColor: NSColor.secondaryLabelColor,
             ])
-            menu.addItem(note)
-            menu.addItem(.separator())
+            menu.addItem(status)
         }
+        if header || active { menu.addItem(.separator()) }
         for (i, o) in Self.options.enumerated() {
             let item = NSMenuItem(title: o.title, action: #selector(pick(_:)), keyEquivalent: "")
             item.target = self
@@ -90,7 +100,7 @@ final class KeepAwake: NSObject, ObservableObject {
         }
         if active {
             menu.addItem(.separator())
-            let off = NSMenuItem(title: "Выключить — Mac снова может засыпать", action: #selector(turnOff), keyEquivalent: "")
+            let off = NSMenuItem(title: "Выключить", action: #selector(turnOff), keyEquivalent: "")
             off.target = self
             menu.addItem(off)
         }

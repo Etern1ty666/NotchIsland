@@ -66,14 +66,13 @@ struct ClipActionButton: View {
 }
 
 /// Запись буфера. Клик — скопировать, перетаскивание — в другое окно;
-/// при наведении вместо времени — булавка, «показать в Finder» и крестик
+/// при наведении вместо времени — «показать в Finder» и крестик
 struct ClipCard: View {
     let item: ClipItem
     let copied: Bool
     /// Ряд с картинкой выше — текст в нём показывает больше строк
     let tall: Bool
     let onCopy: () -> Void
-    let onPin: () -> Void
     let onDelete: () -> Void
     let onDrag: () -> NSItemProvider
     @State private var hover = false
@@ -107,8 +106,6 @@ struct ClipCard: View {
 
     @ViewBuilder func actions(onImage: Bool) -> some View {
         HStack(spacing: 4) {
-            ClipActionButton(systemName: item.pinned ? "pin.slash.fill" : "pin.fill",
-                             help: item.pinned ? "Открепить" : "Закрепить — не удалится", onImage: onImage, action: onPin)
             if item.kind == .files || item.kind == .screenshot {
                 ClipActionButton(systemName: "folder", help: "Показать в Finder", onImage: onImage) {
                     NSWorkspace.shared.activateFileViewerSelecting(item.urls)
@@ -120,13 +117,9 @@ struct ClipCard: View {
         .allowsHitTesting(showActions)
     }
 
-    /// Время; у закреплённой записи — с булавкой
+    /// Когда скопировали
     var timeLabel: some View {
-        HStack(spacing: 3) {
-            if item.pinned { Image(systemName: "pin.fill").font(.system(size: 8)) }
-            Text(relativeTime(item.date)).font(.system(size: 10).monospacedDigit())
-        }
-        .fixedSize()
+        Text(relativeTime(item.date)).font(.system(size: 10).monospacedDigit()).fixedSize()
     }
 
     // Текст, ссылка или файлы

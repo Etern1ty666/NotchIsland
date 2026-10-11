@@ -6,7 +6,7 @@ enum ClipKind: String, Codable {
     case text, image, files, screenshot
 }
 
-/// Сколько хранить незакреплённое. По умолчанию час — как в буфере Gboard
+/// Сколько хранить историю буфера. По умолчанию — всегда (до `ClipboardStore.limit` записей)
 enum ClipRetention: Int, CaseIterable, Identifiable {
     case hour = 3600, day = 86400, forever = 0
     var id: Int { rawValue }
@@ -15,14 +15,6 @@ enum ClipRetention: Int, CaseIterable, Identifiable {
         case .hour: return "1 час"
         case .day: return "1 день"
         case .forever: return "Всегда"
-        }
-    }
-    /// Подпись в подвале буфера
-    var hint: String {
-        switch self {
-        case .hour: return "незакреплённое удаляется через час"
-        case .day: return "незакреплённое удаляется через сутки"
-        case .forever: return "хранятся последние \(ClipboardStore.limit) незакреплённых"
         }
     }
 }
@@ -35,14 +27,13 @@ struct ClipItem: Identifiable, Equatable, Codable {
     /// Картинка из буфера — её копия в папке истории; файлы и скриншот — где они лежат
     let urls: [URL]
     var date: Date
-    var pinned = false
     /// По нему узнаём повторное копирование того же самого (у текста — сам текст)
     let key: String
     /// Превью для списка: переносы и лишние пробелы схлопнуты, считаем один раз
     private(set) var preview = ""
     private(set) var isLink = false
 
-    enum CodingKeys: String, CodingKey { case id, kind, text, urls, date, pinned, key }
+    enum CodingKeys: String, CodingKey { case id, kind, text, urls, date, key }
 
     init(kind: ClipKind, text: String, urls: [URL] = [], date: Date = Date(), key: String = "") {
         self.kind = kind
@@ -62,7 +53,6 @@ struct ClipItem: Identifiable, Equatable, Codable {
                   date: try c.decode(Date.self, forKey: .date),
                   key: try c.decode(String.self, forKey: .key))
         id = try c.decode(UUID.self, forKey: .id)
-        pinned = try c.decode(Bool.self, forKey: .pinned)
     }
 
     static func looksLikeLink(_ s: String) -> Bool {

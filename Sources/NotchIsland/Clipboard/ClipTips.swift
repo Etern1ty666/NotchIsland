@@ -5,17 +5,17 @@ struct ClipTips: View {
     let retention: ClipRetention
 
     var tips: [(icon: String, text: String)] {
-        let rest: String
+        let keep: String
         switch retention {
-        case .hour: rest = "Остальное исчезнет через час"
-        case .day: rest = "Остальное исчезнет через сутки"
-        case .forever: rest = "Остальное хранится, пока записей не больше \(ClipboardStore.limit)"
+        case .hour: keep = "записи старше часа удаляются"
+        case .day: keep = "записи старше суток удаляются"
+        case .forever: keep = "хранятся последние \(ClipboardStore.limit) записей"
         }
         return [
             ("doc.on.clipboard", "Всё, что копируешь, — текст, ссылки, картинки и файлы — появится здесь"),
             ("camera.viewfinder", "Свежие скриншоты (⇧⌘3, ⇧⌘4) тоже попадают сюда"),
             ("cursorarrow.click", "Клик по записи копирует её снова. Её можно и перетащить в другое окно"),
-            ("pin", "Закрепи важное булавкой — оно не удалится. \(rest)"),
+            ("clock.arrow.circlepath", "История остаётся и после перезагрузки — \(keep)"),
         ]
     }
 

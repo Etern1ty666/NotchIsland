@@ -11,8 +11,8 @@ struct SettingsView: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 8) {
             SectionHeader(icon: "list.clipboard", title: "Буфер обмена")
-            SettingsRow(icon: "clock.arrow.circlepath", title: "Хранить незакреплённое",
-                        subtitle: "Закреплённое хранится всегда") {
+            SettingsRow(icon: "clock.arrow.circlepath", title: "Хранить историю",
+                        subtitle: "«Всегда» — последние \(ClipboardStore.limit) записей, и после перезагрузки") {
                 SegmentPicker(options: ClipRetention.allCases.map { ($0, $0.title) }, selection: $clip.retention)
             }
 

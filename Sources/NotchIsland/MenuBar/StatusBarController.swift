@@ -2,7 +2,7 @@ import AppKit
 import SwiftUI
 import Combine
 
-/// Значки в строке меню: статистики и лимиты Claude (какие закреплены), «Mac не засыпает»
+/// Значки в строке меню: статистики и лимиты Claude (какие закреплены), «Держать экран включенным»
 /// и обычная иконка приложения, когда больше ничего нашего нет. У всех одно меню
 @MainActor
 final class StatusBarController: NSObject, NSMenuDelegate {
@@ -15,7 +15,7 @@ final class StatusBarController: NSObject, NSMenuDelegate {
     var statItems: [Stat: NSStatusItem] = [:]
     /// Лимиты подписки Claude — тоже по значку на окно
     var claudeItems: [ClaudeWidget: NSStatusItem] = [:]
-    /// «Mac не засыпает» — отдельный значок, виден, пока режим включён
+    /// «Держать экран включенным» — отдельный значок, виден, пока режим включён
     var awakeItem: NSStatusItem?
     /// Обычная иконка приложения — только когда в строке меню больше ничего нашего нет
     var appItem: NSStatusItem?
@@ -34,8 +34,7 @@ final class StatusBarController: NSObject, NSMenuDelegate {
         appItem = makeItem("app")
         appItem?.button?.image = Self.makeMenuBarIcon()
         appItem?.button?.toolTip = "NotchIsland"
-        awakeItem = makeItem("awake", content: MenuBarAwake())
-        awakeItem?.length = 36
+        awakeItem = makeItem("awake", content: MenuBarAwake(awake: awake))
         for w in ClaudeWidget.allCases.reversed() {
             let item = makeItem("claude.\(w.rawValue)", content: MenuBarClaude(widget: w, usage: usage))
             item.length = ceil(measure(w) + 9)   // запас под двузначные проценты
@@ -61,7 +60,8 @@ final class StatusBarController: NSObject, NSMenuDelegate {
             .receive(on: DispatchQueue.main)
             .sink { [weak self] _ in self?.claudeDidUpdate() }
             .store(in: &bag)
-        awake.$active
+        // включили, выключили или сменили срок — значок и его ширина
+        awake.$active.combineLatest(awake.$until)
             .receive(on: DispatchQueue.main)
             .sink { [weak self] _ in self?.updateStatusItems() }
             .store(in: &bag)
@@ -123,6 +123,7 @@ final class StatusBarController: NSObject, NSMenuDelegate {
         }
         awakeItem?.isVisible = awake.active
         awakeItem?.button?.toolTip = awake.statusText
+        awakeItem?.length = ceil(NSHostingView(rootView: MenuBarAwake(awake: awake)).fittingSize.width + 6)
         appItem?.isVisible = !statItems.values.contains { $0.isVisible }
             && !claudeItems.values.contains { $0.isVisible } && awakeItem?.isVisible != true
         statsDidUpdate()

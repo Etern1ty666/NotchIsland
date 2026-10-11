@@ -2,11 +2,11 @@ import SwiftUI
 import AppKit
 import CryptoKit
 
-/// История всего скопированного вместе со свежими скриншотами. Закреплённое хранится всегда,
-/// остальное — сколько выбрано в настройках. История лежит на диске и переживает перезапуск
+/// История всего скопированного вместе со свежими скриншотами. Лежит на диске и переживает
+/// перезапуск и перезагрузку; по умолчанию хранится всегда (срок — в настройках)
 final class ClipboardStore: ObservableObject {
-    /// Незакреплённых записей не больше стольких — старые уходят
-    static let limit = 30
+    /// Записей не больше стольких — дальше уходят самые старые
+    static let limit = 100
     /// Не сохраняем то, что менеджеры паролей и другие приложения просят не запоминать
     private static let skippedTypes: Set<String> = [
         "org.nspasteboard.ConcealedType",
@@ -18,19 +18,13 @@ final class ClipboardStore: ObservableObject {
 
     /// Все записи, новые сверху
     @Published private(set) var items: [ClipItem] = []
-    /// Пауза: новое не запоминается — как выключатель буфера в Gboard
-    @Published var paused = UserDefaults.standard.bool(forKey: DefaultsKey.clipPaused) {
-        didSet { UserDefaults.standard.set(paused, forKey: DefaultsKey.clipPaused) }
-    }
-    @Published var retention = ClipRetention(rawValue: UserDefaults.standard.object(forKey: DefaultsKey.clipRetention) as? Int ?? 3600) ?? .hour {
+    @Published var retention = ClipRetention(rawValue: UserDefaults.standard.object(forKey: DefaultsKey.clipRetention) as? Int
+                                             ?? ClipRetention.forever.rawValue) ?? .forever {
         didSet {
             UserDefaults.standard.set(retention.rawValue, forKey: DefaultsKey.clipRetention)
             prune()
         }
     }
-
-    var pinnedItems: [ClipItem] { items.filter(\.pinned) }
-    var recentItems: [ClipItem] { items.filter { !$0.pinned } }
 
     private var lastCount = NSPasteboard.general.changeCount
     /// Скриншоты, которые уже побывали в ленте: удалённый из ленты не вернётся
@@ -58,7 +52,6 @@ final class ClipboardStore: ObservableObject {
         let pb = NSPasteboard.general
         guard force || pb.changeCount != lastCount else { return }
         lastCount = pb.changeCount
-        guard !paused else { return }
         let types = pb.types?.map(\.rawValue) ?? []
         if types.contains(where: Self.skippedTypes.contains) { return }
         // при запуске в буфере то, что уже было: не поднимаем его наверх как новое
@@ -104,10 +97,10 @@ final class ClipboardStore: ObservableObject {
         }
     }
 
-    /// Повтор того же самого поднимает запись наверх; закреплённое остаётся на месте
+    /// Повтор того же самого поднимает запись наверх
     private func add(_ item: ClipItem, existing: Bool = false) {
         if let i = items.firstIndex(where: { $0.identity == item.identity }) {
-            if existing || items[i].pinned { return }
+            if existing { return }
             items.remove(at: i)
         }
         items.insert(item, at: items.firstIndex { $0.date < item.date } ?? items.count)
@@ -138,28 +131,26 @@ final class ClipboardStore: ObservableObject {
     func scanScreenshots() -> Bool {
         // удалённые с диска убираем и из ленты
         remove(items.filter { $0.kind == .screenshot && !FileManager.default.fileExists(atPath: $0.urls[0].path) })
-        if !paused {
-            let prefixes = Self.screenshotPrefixes()
-            // старше срока хранения не берём; при «Всегда» — только за последние сутки
-            let age = retention == .forever ? 86400 : TimeInterval(retention.rawValue)
-            let cutoff = Date().addingTimeInterval(-age)
-            let urls = (try? FileManager.default.contentsOfDirectory(
-                at: Self.screenshotDir(), includingPropertiesForKeys: [.creationDateKey],
-                options: .skipsHiddenFiles)) ?? []
-            let found: [(URL, Date)] = urls.compactMap { u in
-                let n = u.lastPathComponent.lowercased()
-                guard ["png", "jpg", "jpeg", "heic"].contains(u.pathExtension.lowercased()),
-                      prefixes.contains(where: n.hasPrefix),
-                      let d = try? u.resourceValues(forKeys: [.creationDateKey]).creationDate, d > cutoff
-                else { return nil }
-                return (u, d)
-            }
-            for (u, d) in found.sorted(by: { $0.1 > $1.1 }).prefix(8) where !seenShots.contains(u.path) {
-                seenShots.append(u.path)
-                add(ClipItem(kind: .screenshot, text: u.lastPathComponent, urls: [u], date: d, key: "shot:" + u.path))
-            }
-            if seenShots.count > 200 { seenShots.removeFirst(seenShots.count - 200) }
+        let prefixes = Self.screenshotPrefixes()
+        // старше срока хранения не берём; при «Всегда» — только за последние сутки
+        let age = retention == .forever ? 86400 : TimeInterval(retention.rawValue)
+        let cutoff = Date().addingTimeInterval(-age)
+        let urls = (try? FileManager.default.contentsOfDirectory(
+            at: Self.screenshotDir(), includingPropertiesForKeys: [.creationDateKey],
+            options: .skipsHiddenFiles)) ?? []
+        let found: [(URL, Date)] = urls.compactMap { u in
+            let n = u.lastPathComponent.lowercased()
+            guard ["png", "jpg", "jpeg", "heic"].contains(u.pathExtension.lowercased()),
+                  prefixes.contains(where: n.hasPrefix),
+                  let d = try? u.resourceValues(forKeys: [.creationDateKey]).creationDate, d > cutoff
+            else { return nil }
+            return (u, d)
         }
+        for (u, d) in found.sorted(by: { $0.1 > $1.1 }).prefix(8) where !seenShots.contains(u.path) {
+            seenShots.append(u.path)
+            add(ClipItem(kind: .screenshot, text: u.lastPathComponent, urls: [u], date: d, key: "shot:" + u.path))
+        }
+        if seenShots.count > 200 { seenShots.removeFirst(seenShots.count - 200) }
         return items.contains { $0.kind == .screenshot && Date().timeIntervalSince($0.date) < 15 }
     }
 
@@ -184,33 +175,18 @@ final class ClipboardStore: ObservableObject {
         return item.urls.first.flatMap { NSItemProvider(contentsOf: $0) } ?? NSItemProvider()
     }
 
-    /// Открепленная запись снова «свежая» — срок хранения считается заново
-    func togglePin(_ item: ClipItem) {
-        guard let i = items.firstIndex(where: { $0.id == item.id }) else { return }
-        items[i].pinned.toggle()
-        if !items[i].pinned {
-            var it = items.remove(at: i)
-            it.date = Date()
-            items.insert(it, at: 0)
-        }
-        prune()
-        save()
-    }
-
     func remove(_ item: ClipItem) { remove([item]) }
-    /// Очистить — всё, кроме закреплённого
-    func clear() { remove(recentItems) }
 
-    /// Убираем просроченное и лишнее сверх лимита
+    /// Убираем просроченное (если срок не «Всегда») и лишнее сверх лимита
     func prune() {
         var gone: [ClipItem] = []
-        var recent = recentItems
+        var kept = items
         if retention != .forever {
             let cutoff = Date().addingTimeInterval(-TimeInterval(retention.rawValue))
-            gone = recent.filter { $0.date < cutoff }
-            recent.removeAll { $0.date < cutoff }
+            gone = kept.filter { $0.date < cutoff }
+            kept.removeAll { $0.date < cutoff }
         }
-        if recent.count > Self.limit { gone += recent.suffix(recent.count - Self.limit) }
+        if kept.count > Self.limit { gone += kept.suffix(kept.count - Self.limit) }
         remove(gone)
     }
 

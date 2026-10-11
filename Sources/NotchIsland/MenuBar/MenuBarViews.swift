@@ -77,14 +77,30 @@ struct MenuBarClaude: View {
     }
 }
 
-/// Отдельный значок «Mac не засыпает» в строке меню — виден, пока режим включён
+/// Отдельный значок «Держать экран включенным» в строке меню — виден, пока режим включён:
+/// оранжевый, а если выбран срок — с обратным отсчётом
 struct MenuBarAwake: View {
+    @ObservedObject var awake: KeepAwake
+
     var body: some View {
-        SleepIcon(slashed: true, size: 11, background: Theme.menuBarPill)
-            .foregroundStyle(Color.white.opacity(0.75))
-            .frame(width: 30, height: 22)
-            .background(Capsule().fill(Theme.menuBarPill))
-            .environment(\.colorScheme, .dark)
+        HStack(spacing: 4) {
+            SleepIcon(slashed: true, size: 11, background: Theme.menuBarPill)
+            // выбран срок — рядом обратный отсчёт; ширина под две цифры, чтобы соседи не прыгали
+            if let until = awake.until {
+                TimelineView(.periodic(from: .now, by: 1)) { context in
+                    ZStack(alignment: .leading) {
+                        ForEach(["88ч", "88м", "88с"], id: \.self) { Text($0).hidden() }
+                        Text(KeepAwake.shortRemaining(until: until, now: context.date))
+                    }
+                    .font(.system(size: 11, weight: .semibold, design: .rounded).monospacedDigit())
+                }
+            }
+        }
+        .foregroundStyle(Theme.awake)
+        .padding(.horizontal, 9)
+        .frame(height: 22)
+        .background(Capsule().fill(Theme.menuBarPill))
+        .environment(\.colorScheme, .dark)
     }
 }
 

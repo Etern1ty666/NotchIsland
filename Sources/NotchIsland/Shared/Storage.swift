@@ -14,8 +14,7 @@ enum DefaultsKey {
     /// Статистики и окна лимитов Claude, закреплённые в строке меню
     static let menuStats = "menuStats"
     static let menuClaude = "menuClaude"
-    /// Буфер: пауза записи и срок хранения незакреплённого
-    static let clipPaused = "clipPaused"
+    /// Буфер: срок хранения истории
     static let clipRetention = "clipRetention"
     /// Автозапуск уже включали один раз после установки
     static let autostartInitialized = "autostartInitialized"

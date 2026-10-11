@@ -53,7 +53,7 @@ struct IslandView: View {
                 } else {
                     switch state.tab {
                     case .clipboard:
-                        ClipboardTab(clip: clip, expanded: state.expanded, openSettings: { openSettings(true) })
+                        ClipboardTab(clip: clip, expanded: state.expanded)
                     case .stats:
                         StatsTab(stats: stats, settings: statsSettings, usage: usage,
                                  openSettings: { openSettings(true) })

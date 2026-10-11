@@ -24,7 +24,7 @@ struct SleepIcon: View {
     }
 }
 
-/// Круглая кнопка «не засыпать» с подсветкой при наведении
+/// Круглая кнопка «не засыпать» с подсветкой при наведении; пока режим включён — оранжевая
 struct SleepButton: View {
     let slashed: Bool
     let help: String
@@ -36,7 +36,7 @@ struct SleepButton: View {
         let bg = Color(white: hover ? 0.16 : 0.08)
         Button(action: action) {
             SleepIcon(slashed: slashed, background: bg)
-                .foregroundStyle(Color.white.opacity(hover ? 0.95 : 0.7))
+                .foregroundStyle(slashed ? Theme.awake : Color.white.opacity(hover ? 0.95 : 0.7))
                 .frame(width: 26, height: 26)
                 .background(Circle().fill(bg))
                 .contentShape(Circle())
