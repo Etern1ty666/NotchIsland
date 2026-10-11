@@ -60,19 +60,22 @@ struct SettingsView: View {
     // MARK: Строка меню
 
     /// Какие значки показывать в строке меню — плитками: ряд системы и ряд лимитов Claude со значком
-    /// приложения, каждая плитка во всю свою долю ширины; нажатие включает и выключает
+    /// приложения, каждая плитка во всю свою долю ширины; нажатие включает и выключает.
+    /// Порядок — по нажатиям: первый включённый крайний справа, следующие левее; у плитки его номер
     var menuBarItems: some View {
         VStack(spacing: 6) {
             HStack(spacing: 6) {
                 ForEach(stats.available) { s in
-                    MenuBarToggle(icon: stats.icon(s), title: s.title, isOn: statsSettings.pinned.contains(s)) {
+                    MenuBarToggle(icon: stats.icon(s), title: s.title, isOn: statsSettings.pinned.contains(s),
+                                  place: place(.stat(s))) {
                         statsSettings.toggle(s)
                     }
                 }
             }
             HStack(spacing: 6) {
                 ForEach(ClaudeWidget.allCases) { w in
-                    MenuBarToggle(icon: "sparkles", title: "Claude · " + w.short, isOn: statsSettings.pinnedClaude.contains(w)) {
+                    MenuBarToggle(icon: "sparkles", title: "Claude · " + w.short, isOn: statsSettings.pinnedClaude.contains(w),
+                                  place: place(.claude(w))) {
                         statsSettings.toggle(w)
                     }
                 }
@@ -83,6 +86,17 @@ struct SettingsView: View {
                 .help(L("Значок приложения — когда других значков нет"))
             }
         }
+    }
+
+    /// Место значка в строке меню справа (1 — крайний), когда наших значков больше одного.
+    /// Статистики, которых на этом Mac нет (батарея), не считаются — их и в строке нет
+    func place(_ item: MenuItem) -> Int? {
+        let available = stats.available
+        let shown = statsSettings.menuOrder.filter {
+            if case .stat(let s) = $0 { return available.contains(s) } else { return true }
+        }
+        guard shown.count > 1, let i = shown.firstIndex(of: item) else { return nil }
+        return i + 1
     }
 
     // MARK: Экран
@@ -177,6 +191,8 @@ struct MenuBarToggle: View {
     let icon: String
     let title: String
     let isOn: Bool
+    /// Место в строке меню справа — маленьким номером после названия
+    var place: Int? = nil
     let action: () -> Void
     @State private var hover = false
 
@@ -185,6 +201,13 @@ struct MenuBarToggle: View {
             HStack(spacing: 6) {
                 Image(systemName: icon).font(.system(size: 11, weight: .semibold)).frame(width: 14)
                 Text(L(title)).font(.system(size: 11, weight: .semibold)).lineLimit(1)
+                if let place {
+                    Text("\(place)")
+                        .font(.system(size: 9, weight: .bold).monospacedDigit())
+                        .foregroundStyle(Color.white.opacity(0.4))
+                        .baselineOffset(4)
+                        .fixedSize()
+                }
             }
             .foregroundStyle(Color.white.opacity(isOn ? 1 : (hover ? 0.7 : 0.4)))
             .frame(maxWidth: .infinity)
@@ -197,7 +220,7 @@ struct MenuBarToggle: View {
         }
         .buttonStyle(.plain)
         .onHover { hover = $0 }
-        .help(isOn ? L("Показывается в строке меню. Нажатие — спрятать") : L("Нажатие — показывать в строке меню"))
+        .help(isOn ? L("Показывается в строке меню. Нажатие — спрятать") : L("Нажатие — показывать в строке меню левее остальных"))
         .accessibilityAddTraits(isOn ? .isSelected : [])
     }
 }

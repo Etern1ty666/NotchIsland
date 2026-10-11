@@ -97,6 +97,7 @@
 "Проверяю" = "Checking";
 "Показывается в строке меню. Нажатие — спрятать" = "Shown in the menu bar. Click to hide";
 "Нажатие — показывать в строке меню" = "Click to show in the menu bar";
+"Нажатие — показывать в строке меню левее остальных" = "Click to show in the menu bar, left of the others";
 "Нажатие — убрать из строки меню" = "Click to remove from the menu bar";
 "Ниже есть ещё" = "More below";
 "Прокрутить вниз" = "Scroll down";

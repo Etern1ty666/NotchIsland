@@ -9,7 +9,9 @@ enum AppPaths {
 
 /// Ключи настроек в UserDefaults — в одном месте, чтобы не разъехались
 enum DefaultsKey {
-    /// Статистики и окна лимитов Claude, закреплённые в строке меню
+    /// Значки, закреплённые в строке меню, в порядке закрепления (первый — крайний справа)
+    static let menuOrder = "menuOrder"
+    /// Прежние наборы без порядка — только чтобы перенести их в menuOrder
     static let menuStats = "menuStats"
     static let menuClaude = "menuClaude"
     /// Значок приложения в строке меню (когда других наших нет)

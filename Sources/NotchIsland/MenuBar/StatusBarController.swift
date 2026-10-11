@@ -5,7 +5,7 @@ import Combine
 /// Значки в строке меню: статистики и лимиты Claude (какие закреплены), «Держать экран включенным»
 /// (пока режим включён) и значок приложения, когда больше ничего нашего нет (его тоже можно спрятать).
 /// Показываются только нужные: при каждом изменении набора значки создаются заново справа налево —
-/// так zzz всегда крайний справа среди наших и не остаётся пустых мест. У каждого своё меню (StatusBarMenus)
+/// так zzz всегда крайний справа среди наших, остальные идут в порядке закрепления и не остаётся пустых мест. У каждого своё меню (StatusBarMenus)
 @MainActor
 final class StatusBarController: NSObject, NSMenuDelegate {
     let stats: SystemStats
@@ -39,11 +39,7 @@ final class StatusBarController: NSObject, NSMenuDelegate {
 
         updateStatusItems()
 
-        statsSettings.$pinned
-            .receive(on: DispatchQueue.main)
-            .sink { [weak self] _ in self?.updateStatusItems() }
-            .store(in: &bag)
-        statsSettings.$pinnedClaude
+        statsSettings.$menuOrder
             .receive(on: DispatchQueue.main)
             .sink { [weak self] _ in self?.updateStatusItems() }
             .store(in: &bag)
@@ -77,9 +73,9 @@ final class StatusBarController: NSObject, NSMenuDelegate {
             .store(in: &bag)
     }
 
-    private func makeItem(_ name: String, kind: MenuKind) -> NSStatusItem {
+    private func makeItem(_ slot: String, kind: MenuKind) -> NSStatusItem {
         let item = NSStatusBar.system.statusItem(withLength: NSStatusItem.variableLength)
-        item.autosaveName = name
+        item.autosaveName = slot
         let menu = NSMenu()
         menu.delegate = self   // содержимое собирается заново при каждом открытии
         menu.autoenablesItems = false
@@ -88,8 +84,8 @@ final class StatusBarController: NSObject, NSMenuDelegate {
         return item
     }
 
-    private func makeItem<V: View>(_ name: String, kind: MenuKind, content: V) -> NSStatusItem {
-        let item = makeItem(name, kind: kind)
+    private func makeItem<V: View>(_ slot: String, kind: MenuKind, content: V) -> NSStatusItem {
+        let item = makeItem(slot, kind: kind)
         if let button = item.button {
             let v = PassthroughHostingView(rootView: content)
             v.frame = button.bounds
@@ -123,12 +119,11 @@ final class StatusBarController: NSObject, NSMenuDelegate {
         // справа налево: macOS ставит каждый новый значок левее предыдущих
         var wanted: [String] = []
         if awake.active { wanted.append("awake.right") }
-        for w in ClaudeWidget.allCases.reversed() where statsSettings.pinnedClaude.contains(w) {
-            wanted.append("claude.\(w.rawValue)")
-        }
+        // дальше — в порядке закрепления: первый закреплённый крайний справа
         let available = stats.available
-        for s in Stat.allCases.reversed() where statsSettings.pinned.contains(s) && available.contains(s) {
-            wanted.append("stat.\(s.rawValue)")
+        for item in statsSettings.menuOrder {
+            if case .stat(let s) = item, !available.contains(s) { continue }
+            wanted.append(item.key)
         }
         if wanted.isEmpty && statsSettings.showAppIcon { wanted = ["app"] }
         if wanted != shown { rebuild(wanted) }
@@ -142,7 +137,8 @@ final class StatusBarController: NSObject, NSMenuDelegate {
     }
 
     /// Убираем все наши значки и создаём нужные заново, справа налево.
-    /// autosaveName запоминает, куда пользователь перетащил значок с ⌘
+    /// macOS запоминает место значка по autosaveName и при пересоздании ставит его туда же, а не по
+    /// порядку создания. Поэтому имя — номер места справа, а не что в значке: «item.0» всегда крайний
     private func rebuild(_ wanted: [String]) {
         let old = Array(statItems.values) + Array(claudeItems.values) + [awakeItem, appItem].compactMap { $0 }
         old.forEach { NSStatusBar.system.removeStatusItem($0) }
@@ -152,20 +148,21 @@ final class StatusBarController: NSObject, NSMenuDelegate {
         appItem = nil
         menuKinds = [:]
         claudeLooks = [:]
-        for name in wanted {
+        for (i, name) in wanted.enumerated() {
+            let slot = "item.\(i)"
             if name == "awake.right" {
-                awakeItem = makeItem(name, kind: .awake, content: MenuBarAwake(awake: awake))
+                awakeItem = makeItem(slot, kind: .awake, content: MenuBarAwake(awake: awake))
             } else if name == "app" {
-                let item = makeItem(name, kind: .app)
+                let item = makeItem(slot, kind: .app)
                 item.button?.image = Self.makeMenuBarIcon()
                 item.button?.toolTip = "NotchIsland"
                 appItem = item
-            } else if let w = ClaudeWidget(rawValue: String(name.dropFirst("claude.".count))), name.hasPrefix("claude.") {
-                let item = makeItem(name, kind: .claude(w), content: MenuBarClaude(widget: w, usage: usage))
+            } else if case .claude(let w) = MenuItem(key: name) {
+                let item = makeItem(slot, kind: .claude(w), content: MenuBarClaude(widget: w, usage: usage))
                 item.length = ceil(measure(w) + 9)   // запас под двузначные проценты
                 claudeItems[w] = item
-            } else if let s = Stat(rawValue: String(name.dropFirst("stat.".count))), name.hasPrefix("stat.") {
-                let item = makeItem(name, kind: .stat(s), content: MenuBarStat(stat: s, stats: stats))
+            } else if case .stat(let s) = MenuItem(key: name) {
+                let item = makeItem(slot, kind: .stat(s), content: MenuBarStat(stat: s, stats: stats))
                 item.length = ceil(measure(s) + reserve(s))
                 statItems[s] = item
             }

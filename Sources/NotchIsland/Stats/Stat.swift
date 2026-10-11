@@ -15,13 +15,40 @@ enum Stat: String, CaseIterable, Identifiable {
     }
 }
 
-/// Какие статистики закреплены в строке меню
-final class StatsSettings: ObservableObject {
-    @Published var pinned: Set<Stat> {
-        didSet { UserDefaults.standard.set(pinned.map(\.rawValue), forKey: DefaultsKey.menuStats) }
+/// Значок в строке меню, который можно закрепить: статистика или окно лимитов Claude
+enum MenuItem: Hashable {
+    case stat(Stat), claude(ClaudeWidget)
+
+    /// Запись в настройках
+    var key: String {
+        switch self {
+        case .stat(let s): return "stat.\(s.rawValue)"
+        case .claude(let w): return "claude.\(w.rawValue)"
+        }
     }
-    @Published var pinnedClaude: Set<ClaudeWidget> {
-        didSet { UserDefaults.standard.set(pinnedClaude.map(\.rawValue), forKey: DefaultsKey.menuClaude) }
+
+    init?(key: String) {
+        if key.hasPrefix("stat."), let s = Stat(rawValue: String(key.dropFirst("stat.".count))) {
+            self = .stat(s)
+        } else if key.hasPrefix("claude."), let w = ClaudeWidget(rawValue: String(key.dropFirst("claude.".count))) {
+            self = .claude(w)
+        } else {
+            return nil
+        }
+    }
+}
+
+/// Какие значки закреплены в строке меню и в каком порядке
+final class StatsSettings: ObservableObject {
+    /// В порядке закрепления: первый — крайний справа, каждый следующий встаёт левее
+    @Published var menuOrder: [MenuItem] {
+        didSet { UserDefaults.standard.set(menuOrder.map(\.key), forKey: DefaultsKey.menuOrder) }
+    }
+    var pinned: Set<Stat> {
+        Set(menuOrder.compactMap { if case .stat(let s) = $0 { return s } else { return nil } })
+    }
+    var pinnedClaude: Set<ClaudeWidget> {
+        Set(menuOrder.compactMap { if case .claude(let w) = $0 { return w } else { return nil } })
     }
     /// Значок приложения, когда других наших значков нет; его меню — «Спрятать»
     @Published var showAppIcon = UserDefaults.standard.object(forKey: DefaultsKey.menuAppIcon) as? Bool ?? true {
@@ -29,20 +56,26 @@ final class StatsSettings: ObservableObject {
     }
 
     init() {
-        // по умолчанию — процессор и диск: все пять значков на строке меню MacBook рядом
-        // с чужими не помещаются, и macOS прячет лишние. Остальное включается булавкой
-        let saved = UserDefaults.standard.stringArray(forKey: DefaultsKey.menuStats)
-        pinned = saved.map { Set($0.compactMap(Stat.init(rawValue:))) } ?? [.cpu, .disk]
-        let savedClaude = UserDefaults.standard.stringArray(forKey: DefaultsKey.menuClaude) ?? []
-        pinnedClaude = Set(savedClaude.compactMap(ClaudeWidget.init(rawValue:)))
+        let d = UserDefaults.standard
+        if let saved = d.stringArray(forKey: DefaultsKey.menuOrder) {
+            menuOrder = saved.compactMap(MenuItem.init(key:))
+        } else {
+            // до порядка были два набора и значки шли в постоянном порядке: справа лимиты Claude,
+            // левее статистики. По умолчанию — процессор и диск: все пять значков на строке меню
+            // MacBook рядом с чужими не помещаются, и macOS прячет лишние. Остальное включается булавкой
+            let stats = d.stringArray(forKey: DefaultsKey.menuStats).map { $0.compactMap(Stat.init(rawValue:)) } ?? [.cpu, .disk]
+            let claude = (d.stringArray(forKey: DefaultsKey.menuClaude) ?? []).compactMap(ClaudeWidget.init(rawValue:))
+            menuOrder = ClaudeWidget.allCases.reversed().filter(claude.contains).map(MenuItem.claude)
+                + Stat.allCases.reversed().filter(stats.contains).map(MenuItem.stat)
+        }
     }
 
-    func toggle(_ s: Stat) {
-        if pinned.contains(s) { pinned.remove(s) } else { pinned.insert(s) }
-    }
+    func toggle(_ s: Stat) { toggle(.stat(s)) }
+    func toggle(_ w: ClaudeWidget) { toggle(.claude(w)) }
 
-    func toggle(_ w: ClaudeWidget) {
-        if pinnedClaude.contains(w) { pinnedClaude.remove(w) } else { pinnedClaude.insert(w) }
+    /// Убрать или поставить последним — левее всех уже закреплённых
+    func toggle(_ item: MenuItem) {
+        if let i = menuOrder.firstIndex(of: item) { menuOrder.remove(at: i) } else { menuOrder.append(item) }
     }
 }
 
