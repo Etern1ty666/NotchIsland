@@ -1,12 +1,10 @@
 import SwiftUI
 import AppKit
 
-/// Страница настроек справа от zzz: срок хранения буфера и откуда брать лимиты подписки Claude
+/// Страница настроек справа от zzz: срок хранения буфера и аккаунт Claude для лимитов подписки
 struct SettingsView: View {
     @ObservedObject var usage: ClaudeUsage
     @ObservedObject var clip: ClipboardStore
-    @State private var message: String?
-    @State private var confirmReplace = false
 
     var body: some View {
         VStack(alignment: .leading, spacing: 8) {
@@ -15,50 +13,23 @@ struct SettingsView: View {
                 SegmentPicker(options: ClipRetention.allCases.map { ($0, $0.title) }, selection: $clip.retention)
             }
 
-            SectionHeader(icon: "sparkles", title: "Лимиты подписки Claude")
+            SectionHeader(icon: "sparkles", title: "Claude")
                 .padding(.top, 6)
-            // Источник 1: вход Claude Code — обновляется сам, учитывает и приложение, и браузер
+            // вход Claude Code: лимиты обновляются сами и учитывают и приложение, и браузер
             SettingsRow(icon: loginIcon, iconColor: loginColor, title: "Аккаунт Claude", help: loginStatus) {
                 loginButtons
             }
-
-            if let message {
-                Label(message, systemImage: "exclamationmark.triangle.fill")
-                    .font(.system(size: 11))
-                    .foregroundStyle(Theme.danger)
-                    .lineLimit(1)
-            }
-
-            // Источник 2: строка состояния Claude Code — официально, но только для терминала
-            SettingsRow(icon: "terminal", title: "Лимиты из терминала Claude Code", help: lineStatus) {
-                connectionButton
-            }
         }
         .frame(maxHeight: .infinity, alignment: .top)
-        .onAppear { usage.refreshConnection() }
-    }
-
-    @ViewBuilder var connectionButton: some View {
-        switch usage.connection {
-        case .ours:
-            PillButton(title: "Отключить", destructive: true) { message = usage.disconnect() }
-        case .none:
-            PillButton(title: "Подключить") { message = usage.connect() }
-        case .other:
-            PillButton(title: confirmReplace ? "Точно заменить?" : "Заменить", destructive: confirmReplace) {
-                if confirmReplace { message = usage.connect(); confirmReplace = false }
-                else { confirmReplace = true }
-            }
-        }
     }
 
     @ViewBuilder var loginButtons: some View {
         if !usage.accountEnabled {
             PillButton(title: "Подключить") { usage.setAccountEnabled(true) }
-        } else if usage.loggedIn {
-            PillButton(title: "Проверить сейчас") { usage.fetchNow() }
+        } else if usage.loggedIn && !usage.authLost {
             PillButton(title: "Отключить", destructive: true) { usage.setAccountEnabled(false) }
         } else {
+            // входа нет или он пропал — войти (заново)
             switch usage.login {
             case .idle:
                 PillButton(title: "Войти") { usage.startLogin() }
@@ -74,11 +45,12 @@ struct SettingsView: View {
         }
     }
 
+    /// Состояние — в подсказке при наведении на строку
     var loginStatus: String {
-        if !usage.accountEnabled { return "Отключено — лимиты через аккаунт не запрашиваются" }
-        if !usage.loggedIn {
+        if !usage.accountEnabled { return "Отключено — лимиты не запрашиваются" }
+        if !usage.loggedIn || usage.authLost {
             switch usage.login {
-            case .idle: return "Вход не выполнен"
+            case .idle: return usage.authLost ? (usage.apiError ?? "Вход пропал — войди заново") : "Вход не выполнен"
             case .waiting: return "Жду вход в браузере…"
             case .failed(let m): return m
             }
@@ -86,20 +58,16 @@ struct SettingsView: View {
         if let e = usage.apiError { return e }
         return usage.updatedAt.map { "Вход выполнен · обновлено " + agoText($0) } ?? "Проверяю…"
     }
+    /// Красный — только когда вход пропал; временные сбои сервера и сети значок не трогают
     var loginIcon: String {
-        !usage.accountEnabled ? "person.crop.circle"
-            : !usage.loggedIn ? "person.crop.circle.badge.questionmark"
-            : (usage.apiError == nil ? "checkmark.circle.fill" : "exclamationmark.circle.fill")
+        if !usage.accountEnabled { return "person.crop.circle" }
+        if usage.authLost { return "exclamationmark.circle.fill" }
+        return usage.loggedIn ? "checkmark.circle.fill" : "person.crop.circle.badge.questionmark"
     }
     var loginColor: Color {
-        !usage.accountEnabled || !usage.loggedIn ? Color.white.opacity(0.5) : (usage.apiError == nil ? Theme.ok : Theme.critical)
-    }
-    var lineStatus: String {
-        switch usage.connection {
-        case .ours: return "Подключено"
-        case .none: return "Не подключено"
-        case .other: return "Занято другой строкой состояния"
-        }
+        if !usage.accountEnabled { return Color.white.opacity(0.5) }
+        if usage.authLost { return Theme.critical }
+        return usage.loggedIn ? Theme.ok : Color.white.opacity(0.5)
     }
 }
 

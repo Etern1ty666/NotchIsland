@@ -1,6 +1,6 @@
 import SwiftUI
 
-/// Вкладка «Буфер»: вся история, новые сверху. Пустой буфер показывает подсказки
+/// Вкладка «Буфер»: вся история, новые первыми. Пустой буфер показывает подсказки
 struct ClipboardTab: View {
     @ObservedObject var clip: ClipboardStore
     /// Остров раскрыт — при каждом раскрытии сбрасываем «Скопировано»
@@ -31,31 +31,18 @@ struct ClipboardTab: View {
         }
     }
 
-    /// Ряды по две записи; непарная последняя растягивается — полупустых рядов не бывает
-    func clipRows(_ items: [ClipItem]) -> [[ClipItem]] {
-        stride(from: 0, to: items.count, by: 2).map { Array(items[$0..<min($0 + 2, items.count)]) }
-    }
-
-    /// Ряд с картинкой выше: в нём видно сам снимок, а текст рядом — на несколько строк.
-    /// Ряды ленивые: картинки грузятся, только когда до них долистали
+    /// Записи потоком: каждая своего размера, текст не шире двух третей острова
     func clipGrid(_ items: [ClipItem]) -> some View {
-        LazyVStack(spacing: 8) {
-            ForEach(clipRows(items), id: \.first!.id) { row in
-                let tall = row.contains(where: \.isVisual)
-                HStack(spacing: 8) {
-                    ForEach(row) { item in
-                        ClipCard(item: item,
-                                 copied: copiedKey == item.id.uuidString,
-                                 tall: tall,
-                                 onCopy: {
-                                     clip.copy(item)
-                                     markCopied(item.id.uuidString)
-                                 },
-                                 onDelete: { withAnimation(.easeOut(duration: 0.2)) { clip.remove(item) } },
-                                 onDrag: { clip.dragProvider(item) })
-                    }
-                }
-                .frame(height: tall ? 96 : 44)
+        FlowLayout(spacing: 8, maxItemWidth: 400) {
+            ForEach(items) { item in
+                ClipCard(item: item,
+                         copied: copiedKey == item.id.uuidString,
+                         onCopy: {
+                             clip.copy(item)
+                             markCopied(item.id.uuidString)
+                         },
+                         onDelete: { withAnimation(.easeOut(duration: 0.2)) { clip.remove(item) } },
+                         onDrag: { clip.dragProvider(item) })
             }
         }
     }

@@ -37,12 +37,6 @@ final class IslandState: ObservableObject {
 
 enum Tab: String, CaseIterable {
     case clipboard, stats
-    var icon: String {
-        switch self {
-        case .clipboard: return "list.clipboard"
-        case .stats: return "waveform.path.ecg"
-        }
-    }
     var title: String {
         switch self {
         case .clipboard: return "Буфер"

@@ -58,6 +58,11 @@ func resetText(_ d: Date?) -> String {
     return "сброс в \(f.string(from: d).lowercased())"
 }
 
+extension String {
+    /// «сброс через 2 ч» → «Сброс через 2 ч»
+    var capitalizedFirst: String { prefix(1).uppercased() + dropFirst() }
+}
+
 /// «обновлено 5 мин назад»
 func agoText(_ d: Date) -> String {
     let m = Int(-d.timeIntervalSinceNow / 60)

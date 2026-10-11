@@ -13,6 +13,8 @@ final class IslandController: NSObject {
     private var collapseWork: DispatchWorkItem?
     /// Открыто выпадающее меню — курсор может уйти за край острова, сворачивать нельзя
     private var menuOpen = false
+    /// Проверка курсора уже запланирована — события мыши идут пачками, хватит одной на пачку
+    private var movePending = false
 
     init(stats: SystemStats, statsSettings: StatsSettings, usage: ClaudeUsage) {
         screen = Self.pickScreen() ?? NSScreen.screens[0]
@@ -56,10 +58,10 @@ final class IslandController: NSObject {
         state.openAwakeMenu = { [weak self] r in self?.showAwakeMenu(below: r) }
 
         NSEvent.addGlobalMonitorForEvents(matching: .mouseMoved) { [weak self] _ in
-            DispatchQueue.main.async { self?.mouseMoved() }
+            self?.scheduleMouseMoved()
         }
         NSEvent.addLocalMonitorForEvents(matching: .mouseMoved) { [weak self] e in
-            DispatchQueue.main.async { self?.mouseMoved() }
+            self?.scheduleMouseMoved()
             return e
         }
         // Подключили монитор, сменили разрешение, закрыли крышку — пересчитываем положение
@@ -149,16 +151,31 @@ final class IslandController: NSObject {
         }
     }
 
-    /// Меню сроков «не засыпать» под кнопкой на острове
+    private func scheduleMouseMoved() {
+        guard !movePending else { return }
+        movePending = true
+        DispatchQueue.main.async { [weak self] in
+            self?.movePending = false
+            self?.mouseMoved()
+        }
+    }
+
+    /// Меню сроков «Держать экран включенным» под кнопкой на острове
     func showAwakeMenu(below r: CGRect) {
         // .global у SwiftUI — от левого верхнего угла окна острова; переводим в координаты экрана.
         // Верх меню держим ниже строки меню, иначе macOS обрезает его и показывает стрелку прокрутки
         let y = min(panel.frame.maxY - r.maxY - 6, screen.visibleFrame.maxY - 8)
         let p = NSPoint(x: panel.frame.minX + r.minX, y: y)
         menuOpen = true
-        awake.makeMenu(header: true).popUp(positioning: nil, at: p, in: nil)   // ждёт, пока меню закроется
-        menuOpen = false
-        mouseMoved()
+        // открываем после того, как SwiftUI закончит обработку клика: popUp ждёт, пока меню
+        // закроется, и прямо внутри действия кнопки держал бы SwiftUI посреди обновления —
+        // подсветка пунктов меню от этого отставала
+        DispatchQueue.main.async { [weak self] in
+            guard let self else { return }
+            self.awake.makeMenu(header: true).popUp(positioning: nil, at: p, in: nil)
+            self.menuOpen = false
+            self.mouseMoved()
+        }
     }
 
     func cancelExpand() {

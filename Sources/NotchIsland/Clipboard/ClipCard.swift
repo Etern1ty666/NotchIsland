@@ -6,8 +6,8 @@ struct ImageBox: @unchecked Sendable {
     init(_ image: NSImage?) { self.image = image }
 }
 
-/// Превью картинки целиком (без обрезки), по краям — она же, размытая: снимок любой формы
-/// заполняет карточку без пустых полей
+/// Превью картинки целиком (без обрезки). Карточка по форме снимка; если снимок слишком узкий
+/// или широкий и форму пришлось ограничить, по краям — он же, размытый, без пустых полей
 struct Thumb: View {
     let url: URL
     @State private var img: NSImage?
@@ -32,11 +32,29 @@ struct Thumb: View {
         guard let src = CGImageSourceCreateWithURL(url as CFURL, nil) else { return nil }
         let opts: [CFString: Any] = [
             kCGImageSourceCreateThumbnailFromImageAlways: true,
-            kCGImageSourceThumbnailMaxPixelSize: 480,
+            kCGImageSourceThumbnailMaxPixelSize: 400,
             kCGImageSourceCreateThumbnailWithTransform: true,
         ]
         guard let cg = CGImageSourceCreateThumbnailAtIndex(src, 0, opts as CFDictionary) else { return nil }
         return NSImage(cgImage: cg, size: .zero)
+    }
+
+    /// Ширина к высоте снимка — из заголовка файла, без загрузки самой картинки; запоминаем
+    @MainActor private static var aspects: [URL: CGFloat] = [:]
+
+    @MainActor static func aspect(_ url: URL) -> CGFloat {
+        if let a = aspects[url] { return a }
+        var a: CGFloat = 16.0 / 10
+        if let src = CGImageSourceCreateWithURL(url as CFURL, nil),
+           let p = CGImageSourceCopyPropertiesAtIndex(src, 0, nil) as? [CFString: Any],
+           let w = (p[kCGImagePropertyPixelWidth] as? NSNumber)?.doubleValue,
+           let h = (p[kCGImagePropertyPixelHeight] as? NSNumber)?.doubleValue, w > 0, h > 0 {
+            // поворот из EXIF (5–8) меняет стороны местами
+            let rotated = ((p[kCGImagePropertyOrientation] as? NSNumber)?.intValue ?? 1) >= 5
+            a = rotated ? h / w : w / h
+        }
+        aspects[url] = a
+        return a
     }
 }
 
@@ -66,12 +84,15 @@ struct ClipActionButton: View {
 }
 
 /// Запись буфера. Клик — скопировать, перетаскивание — в другое окно;
-/// при наведении вместо времени — «показать в Finder» и крестик
+/// при наведении вместо времени — «показать в Finder» и крестик.
+/// Размер — по содержимому: текст не шире, чем нужно (длинный переносится), снимок — по своей форме
 struct ClipCard: View {
+    /// Высота карточки со снимком; ширина — по пропорциям снимка, но в этих пределах
+    static let visualHeight: CGFloat = 96
+    static let visualWidth: ClosedRange<CGFloat> = 110...604
+
     let item: ClipItem
     let copied: Bool
-    /// Ряд с картинкой выше — текст в нём показывает больше строк
-    let tall: Bool
     let onCopy: () -> Void
     let onDelete: () -> Void
     let onDrag: () -> NSItemProvider
@@ -82,7 +103,6 @@ struct ClipCard: View {
         Group {
             if let url = item.imageURL { visual(url) } else { plain }
         }
-        .frame(maxWidth: .infinity, maxHeight: .infinity)
         .clipShape(shape)
         .overlay(shape.strokeBorder(Color.white.opacity(item.isVisual && hover ? 0.45 : 0), lineWidth: 1))
         .contentShape(shape)
@@ -129,7 +149,7 @@ struct ClipCard: View {
             VStack(alignment: .leading, spacing: 1) {
                 Text(item.preview)
                     .font(.system(size: 12))
-                    .lineLimit(item.kind == .files ? 1 : (tall ? 5 : 2))
+                    .lineLimit(item.kind == .files ? 1 : 4)
                     .truncationMode(item.kind == .files ? .middle : .tail)
                     .multilineTextAlignment(.leading)
                 if item.kind == .files && item.urls.count > 1 {
@@ -138,25 +158,29 @@ struct ClipCard: View {
                         .foregroundStyle(Color.white.opacity(0.45))
                 }
             }
-            .frame(maxWidth: .infinity, alignment: .leading)
             timeLabel
                 .foregroundStyle(Color.white.opacity(0.4))
                 .opacity(hover || copied ? 0 : 1)
         }
         .padding(.leading, 10)
         .padding(.trailing, 8)
-        .frame(maxWidth: .infinity, maxHeight: .infinity)
+        .padding(.vertical, 8)
+        // не уже, чем нужно кнопкам при наведении, и не ниже одной строки с запасом
+        .frame(minWidth: 120, minHeight: 44, alignment: .leading)
         .background(cardColor)
         // кнопки и «Скопировано» — поверх конца текста, а не в зарезервированном под них месте:
         // так тексту остаётся вся ширина карточки
         .overlay(alignment: .trailing) {
-            ZStack(alignment: .trailing) {
-                Text("Скопировано")
-                    .font(.system(size: 10, weight: .semibold))
-                    .foregroundStyle(Color.green)
-                    .fixedSize()
-                    .opacity(copied ? 1 : 0)
-                actions(onImage: false)
+            // подложка ровно под то, что видно: в короткой карточке не закрывает текст целиком
+            Group {
+                if copied {
+                    Text("Скопировано")
+                        .font(.system(size: 10, weight: .semibold))
+                        .foregroundStyle(Color.green)
+                        .fixedSize()
+                } else {
+                    actions(onImage: false)
+                }
             }
             .padding(.leading, 24)
             .padding(.trailing, 8)
@@ -187,7 +211,10 @@ struct ClipCard: View {
 
     // Картинка, скриншот или файл-картинка
     func visual(_ url: URL) -> some View {
-        Thumb(url: url)
+        let width = min(max(Self.visualHeight * Thumb.aspect(url), Self.visualWidth.lowerBound),
+                        Self.visualWidth.upperBound)
+        return Thumb(url: url)
+            .frame(width: width, height: Self.visualHeight)
             .overlay(alignment: .bottom) {
                 HStack(spacing: 4) {
                     HStack(spacing: 3) {
@@ -198,6 +225,8 @@ struct ClipCard: View {
                     .padding(.horizontal, 6)
                     .padding(.vertical, 2)
                     .background(Capsule().fill(Color.black.opacity(0.6)))
+                    // в узкой карточке время уступает место кнопкам
+                    .opacity(showActions && width < 170 ? 0 : 1)
                     Spacer(minLength: 0)
                     actions(onImage: true)
                 }

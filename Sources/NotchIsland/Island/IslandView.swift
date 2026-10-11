@@ -126,8 +126,7 @@ struct TabButton: View {
 
     var body: some View {
         Button(action: action) {
-            Image(systemName: tab.icon)
-                .font(.system(size: 12, weight: .semibold))
+            icon
                 .frame(width: 36, height: 26)
             .background {
                 if selected {
@@ -143,5 +142,27 @@ struct TabButton: View {
         .onHover { hover = $0 }
         .help(tab.title)
         .accessibilityLabel(tab.title)
+    }
+
+    @ViewBuilder var icon: some View {
+        switch tab {
+        case .clipboard: Image(systemName: "list.clipboard").font(.system(size: 12, weight: .semibold))
+        case .stats: BarsIcon().frame(width: 12, height: 11)
+        }
+    }
+}
+
+/// Значок статистики: три столбика — средний, высокий, низкий
+struct BarsIcon: Shape {
+    func path(in rect: CGRect) -> Path {
+        let gap = rect.width * 0.14
+        let w = (rect.width - 2 * gap) / 3
+        var p = Path()
+        for (i, h) in [0.62, 1.0, 0.36].enumerated() {
+            let height = rect.height * h
+            let bar = CGRect(x: rect.minX + CGFloat(i) * (w + gap), y: rect.maxY - height, width: w, height: height)
+            p.addRoundedRect(in: bar, cornerSize: CGSize(width: w / 2, height: w / 2), style: .continuous)
+        }
+        return p
     }
 }

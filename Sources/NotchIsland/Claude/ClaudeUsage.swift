@@ -2,28 +2,23 @@ import SwiftUI
 import AppKit
 import Security
 
-/// Лимиты подписки (сессия 5 ч и неделя, как в /usage) — из двух источников:
-/// • вход Claude Code (`claude auth login`): раз в минуту спрашиваем сервер Anthropic напрямую.
-///   Учитывается всё — приложение Claude, браузер, терминал. Адрес неофициальный (им пользуется
-///   сам Claude Code для /usage), может перестать работать после обновлений;
-/// • строка состояния Claude Code в терминале (`NotchIsland --statusline`) — официально, но только
-///   после ответов в терминале
+/// Лимиты подписки (сессия 5 ч и неделя, как в /usage) через вход Claude Code (`claude auth login`):
+/// раз в минуту спрашиваем сервер Anthropic напрямую. Учитывается всё — приложение Claude, браузер,
+/// терминал. Адрес неофициальный (им пользуется сам Claude Code для /usage), может перестать
+/// работать после обновлений
 @MainActor
 final class ClaudeUsage: ObservableObject {
     /// Раз в минуту; если сервер ответит «слишком часто» (429), ждём, сколько он просит
     static let pollInterval: TimeInterval = 60
 
-    /// Сюда пишет лимиты строка состояния Claude Code (`NotchIsland --statusline`)
-    nonisolated static let file = AppPaths.support.appendingPathComponent("claude-usage.json")
-    static let claudeSettings = FileManager.default.homeDirectoryForCurrentUser
-        .appendingPathComponent(".claude/settings.json")
-
     @Published private(set) var fiveHour: UsageWindow?
     @Published private(set) var sevenDay: UsageWindow?
     @Published private(set) var updatedAt: Date?
-    @Published private(set) var connection: Connection = .none
     /// Вход Claude Code есть в связке ключей
     @Published private(set) var loggedIn = false
+    /// Вход пропал: устарел или у него больше нет доступа к лимитам — нужно войти заново.
+    /// Только тогда значок аккаунта в настройках красный; «подожди» и сбои сети — не повод
+    @Published private(set) var authLost = false
     /// Брать лимиты через вход Claude Code. «Отключить» в настройках только перестаёт спрашивать
     /// сервер — из самого Claude Code не выходим, терминал продолжает работать
     @Published private(set) var accountEnabled = UserDefaults.standard.object(forKey: DefaultsKey.claudeAccount) as? Bool ?? true
@@ -43,26 +38,19 @@ final class ClaudeUsage: ObservableObject {
     /// Сервер отказал в доступе — не долбим его, пока вход не сменится
     private var blockedToken: String?
 
-    enum Connection: Equatable {
-        case none        // строка состояния Claude Code не настроена
-        case ours        // подключено к нам
-        case other       // у пользователя своя строка состояния — не трогаем без спроса
-    }
-
-    private var fileDate: Date?
+    private var ticks = 0
     private var timer: Timer?
 
     init() {
         Self.removeOldToken()
-        refreshConnection()
-        reload()
+        Self.removeStatusLine()
         Task { await fetch() }
-        // файл маленький, проверяем дату изменения раз в 3 секунды — дёшево;
-        // сервер — по расписанию nextFetch
+        // сервер — по расписанию nextFetch; раз в 30 с перерисовываем «сброс через N мин»
         let t = Timer(timeInterval: 3, repeats: true) { [weak self] _ in
             MainActor.assumeIsolated {
                 guard let self else { return }
-                self.reload()
+                self.ticks += 1
+                if self.ticks % 10 == 0 { self.objectWillChange.send() }
                 // пока идёт вход — проверяем почаще, чтобы цифры появились сразу после него
                 if case .waiting = self.login, !self.loggedIn { self.nextFetch = min(self.nextFetch, Date()) }
                 if Date() >= self.nextFetch { Task { await self.fetch() } }
@@ -73,33 +61,16 @@ final class ClaudeUsage: ObservableObject {
         timer = t
     }
 
-    func reload() {
-        let date = (try? Self.file.resourceValues(forKeys: [.contentModificationDateKey]))?.contentModificationDate
-        guard let date, date != fileDate,
-              let data = try? Data(contentsOf: Self.file),
-              let json = (try? JSONSerialization.jsonObject(with: data)) as? [String: Any] else {
-            objectWillChange.send()   // «сброс через N мин» и isReset зависят от времени
-            return
-        }
-        fileDate = date
-        let at = (json["updated_at"] as? Double).map { Date(timeIntervalSince1970: $0) } ?? date
-        // свежее, чем ответ сервера, — берём
-        if updatedAt.map({ at > $0 }) ?? true {
-            apply(Self.window(json["five_hour"]), Self.window(json["seven_day"]), at: at)
-        }
-    }
-
     private func apply(_ five: UsageWindow?, _ seven: UsageWindow?, at: Date) {
         fiveHour = five
         sevenDay = seven
         updatedAt = at
     }
 
-    /// Окно из JSON: проценты — used_percentage (строка состояния) или utilization (сервер),
-    /// сброс — секунды Unix или строка ISO 8601
+    /// Окно из ответа сервера: проценты — utilization, сброс — секунды Unix или строка ISO 8601
     private static func window(_ any: Any?) -> UsageWindow? {
         guard let d = any as? [String: Any],
-              let used = ((d["used_percentage"] ?? d["utilization"]) as? NSNumber)?.doubleValue else { return nil }
+              let used = (d["utilization"] as? NSNumber)?.doubleValue else { return nil }
         var reset: Date?
         if let n = d["resets_at"] as? NSNumber { reset = Date(timeIntervalSince1970: n.doubleValue) }
         if let str = d["resets_at"] as? String { reset = parseISODate(str) }
@@ -130,9 +101,8 @@ final class ClaudeUsage: ObservableObject {
         return "Claude · \(w.title): \(spent), \(resetText(win.resetsAt))"
     }
 
-    /// Кнопка «обновить»: перечитываем файл строки состояния и сразу спрашиваем сервер
+    /// Кнопка «обновить» на вкладке статистики
     func refresh() {
-        reload()
         Task { await fetch() }
     }
 
@@ -144,6 +114,7 @@ final class ClaudeUsage: ObservableObject {
         // чтение связки ключей — внешний процесс, уводим с главного потока
         guard var creds = await Task.detached(operation: { ClaudeCodeLogin.read() }).value, creds.isLoggedIn else {
             loggedIn = false
+            authLost = false
             apiError = nil
             return
         }
@@ -163,18 +134,21 @@ final class ClaudeUsage: ObservableObject {
                 guard five != nil || seven != nil else { apiError = "Сервер не прислал лимиты"; return }
                 apply(five, seven, at: Date())
                 apiError = nil
+                authLost = false
             case 429:
                 // слишком часто — ждём, сколько просит сервер (но не меньше 5 минут)
                 nextFetch = Date().addingTimeInterval(max(retry ?? 0, 300))
                 apiError = "Сервер просит подождать — повторю через \(formatMinutes(Int(max(retry ?? 0, 300) / 60)))"
-            case 403:
+            case 401, 403:
                 blockedToken = creds.accessToken
-                apiError = "У входа нет доступа к лимитам — войди заново: claude auth login"
+                authLost = true
+                apiError = "Вход Claude Code больше не действует — войди заново"
             default:
                 apiError = ((json["error"] as? [String: Any])?["message"] as? String) ?? "Ошибка сервера (HTTP \(status))"
             }
         } catch ClaudeCodeLogin.RefreshError.expired {
-            apiError = "Вход Claude Code устарел — войди заново: claude auth login"
+            authLost = true
+            apiError = "Вход Claude Code устарел — войди заново"
         } catch ClaudeCodeLogin.RefreshError.network(let m) {
             apiError = m
         } catch {
@@ -286,19 +260,18 @@ final class ClaudeUsage: ObservableObject {
         }
     }
 
-    /// Подключить или отключить аккаунт. Без него остаются только цифры из строки состояния терминала
+    /// Подключить или отключить аккаунт: отключённый не спрашивает сервер, цифр лимитов нет
     func setAccountEnabled(_ on: Bool) {
         accountEnabled = on
         UserDefaults.standard.set(on, forKey: DefaultsKey.claudeAccount)
         apiError = nil
+        authLost = false
         if on {
             fetchNow()
         } else {
             fiveHour = nil
             sevenDay = nil
             updatedAt = nil
-            fileDate = nil
-            reload()
         }
     }
 
@@ -309,76 +282,25 @@ final class ClaudeUsage: ObservableObject {
         Task { await fetch() }
     }
 
-    // MARK: Подключение к Claude Code
+    // MARK: Уборка за прежними версиями
 
-    /// Команда, которую Claude Code запускает как строку состояния
-    static var command: String { "\"\(Bundle.main.executablePath ?? "/Applications/NotchIsland.app/Contents/MacOS/NotchIsland")\" --statusline" }
-
-    private static func readSettings() -> [String: Any] {
-        guard let data = try? Data(contentsOf: claudeSettings),
-              let json = (try? JSONSerialization.jsonObject(with: data)) as? [String: Any] else { return [:] }
-        return json
-    }
-
-    func refreshConnection() {
-        guard let line = Self.readSettings()["statusLine"] as? [String: Any] else { connection = .none; return }
-        connection = (line["command"] as? String)?.contains("--statusline") == true
-            && (line["command"] as? String)?.contains("NotchIsland") == true ? .ours : .other
-    }
-
-    /// Прописываем себя строкой состояния в ~/.claude/settings.json. Прежний файл
-    /// сохраняем рядом (settings.json.notchisland-backup), остальные настройки не трогаем
-    func connect() -> String? {
-        var settings = Self.readSettings()
-        settings["statusLine"] = ["type": "command", "command": Self.command]
-        return writeSettings(settings)
-    }
-
-    func disconnect() -> String? {
-        var settings = Self.readSettings()
-        settings.removeValue(forKey: "statusLine")
-        return writeSettings(settings)
-    }
-
-    private func writeSettings(_ settings: [String: Any]) -> String? {
-        let fm = FileManager.default
-        do {
-            try fm.createDirectory(at: Self.claudeSettings.deletingLastPathComponent(), withIntermediateDirectories: true)
-            if fm.fileExists(atPath: Self.claudeSettings.path) {
-                let backup = Self.claudeSettings.appendingPathExtension("notchisland-backup")
-                try? fm.removeItem(at: backup)
-                try fm.copyItem(at: Self.claudeSettings, to: backup)
-            }
-            let data = try JSONSerialization.data(withJSONObject: settings,
-                                                  options: [.prettyPrinted, .sortedKeys, .withoutEscapingSlashes])
-            try data.write(to: Self.claudeSettings, options: .atomic)
-            refreshConnection()
-            return nil
-        } catch {
-            return error.localizedDescription
-        }
-    }
-
-    // MARK: Режим строки состояния
-
-    /// `NotchIsland --statusline`: Claude Code передаёт JSON на stdin. Сохраняем лимиты для острова
-    /// и печатаем короткую строку — её Claude Code покажет внизу терминала
-    nonisolated static func runStatusLine() {
-        let input = FileHandle.standardInput.readDataToEndOfFile()
-        let json = (try? JSONSerialization.jsonObject(with: input)) as? [String: Any] ?? [:]
-        guard let limits = json["rate_limits"] as? [String: Any],
-              limits["five_hour"] != nil || limits["seven_day"] != nil else { return }
-        var out = limits
-        out["updated_at"] = Date().timeIntervalSince1970
-        if let data = try? JSONSerialization.data(withJSONObject: out) {
-            try? FileManager.default.createDirectory(at: AppPaths.support, withIntermediateDirectories: true)
-            try? data.write(to: file, options: .atomic)
-        }
-        func pct(_ key: String) -> String? {
-            ((limits[key] as? [String: Any])?["used_percentage"] as? NSNumber)
-                .map { "\(Int($0.doubleValue.rounded()))%" }
-        }
-        let parts = [pct("five_hour").map { "сессия \($0)" }, pct("seven_day").map { "неделя \($0)" }].compactMap { $0 }
-        print("Claude: " + parts.joined(separator: " · "))
+    /// Прежние версии брали лимиты ещё и из строки состояния Claude Code в терминале.
+    /// Этот источник убран: отключаем строку состояния, если она наша (чужую не трогаем),
+    /// и удаляем файл, куда она писала. Копия настроек — рядом, settings.json.notchisland-backup
+    private static func removeStatusLine() {
+        try? FileManager.default.removeItem(at: AppPaths.support.appendingPathComponent("claude-usage.json"))
+        let url = FileManager.default.homeDirectoryForCurrentUser.appendingPathComponent(".claude/settings.json")
+        guard let data = try? Data(contentsOf: url),
+              var json = (try? JSONSerialization.jsonObject(with: data)) as? [String: Any],
+              let command = (json["statusLine"] as? [String: Any])?["command"] as? String,
+              command.contains("NotchIsland"), command.contains("--statusline") else { return }
+        json.removeValue(forKey: "statusLine")
+        guard let out = try? JSONSerialization.data(withJSONObject: json,
+                                                    options: [.prettyPrinted, .sortedKeys, .withoutEscapingSlashes])
+        else { return }
+        let backup = url.appendingPathExtension("notchisland-backup")
+        try? FileManager.default.removeItem(at: backup)
+        try? FileManager.default.copyItem(at: url, to: backup)
+        try? out.write(to: url, options: .atomic)
     }
 }
