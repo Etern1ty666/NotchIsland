@@ -99,16 +99,16 @@ struct IslandView: View {
             Color.clear.frame(width: state.notch.width)
 
             HStack(spacing: 6) {
-                // «не засыпать»: по клику — выпадающее меню со сроками прямо под кнопкой
+                CircleIconButton(systemName: "gearshape", help: "Настройки", active: state.showSettings) {
+                    openSettings(!state.showSettings)
+                }
+                // «Держать экран включенным» — крайняя справа; по клику меню сроков прямо под кнопкой
                 GeometryReader { g in
                     SleepButton(slashed: awake.active, help: awake.statusText) {
                         state.openAwakeMenu?(g.frame(in: .global))
                     }
                 }
                 .frame(width: 26, height: 26)
-                CircleIconButton(systemName: "gearshape", help: "Настройки", active: state.showSettings) {
-                    openSettings(!state.showSettings)
-                }
             }
             .padding(.trailing, 12)
             .frame(width: side, alignment: .trailing)

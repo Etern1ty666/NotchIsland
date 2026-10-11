@@ -1,7 +1,7 @@
 import SwiftUI
 import AppKit
 
-/// Страница настроек справа от zzz: срок хранения буфера и аккаунт Claude для лимитов подписки
+/// Страница настроек (шестерёнка слева от zzz): срок хранения буфера и аккаунт Claude для лимитов подписки
 struct SettingsView: View {
     @ObservedObject var usage: ClaudeUsage
     @ObservedObject var clip: ClipboardStore

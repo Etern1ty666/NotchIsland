@@ -54,10 +54,9 @@ final class KeepAwake: NSObject, ObservableObject {
     /// Название режима — в меню и подсказках
     static let title = "Держать экран включенным"
 
-    /// «Экран не гаснет ещё 1 ч 12 мин»
+    /// «Экран не гаснет ещё 1 ч 12 мин»; без срока — просто название режима
     var statusText: String {
-        guard active else { return Self.title }
-        guard let until else { return "Экран не гаснет, пока не выключишь" }
+        guard active, let until else { return Self.title }
         let m = max(1, Int((until.timeIntervalSinceNow / 60).rounded(.up)))
         return "Экран не гаснет ещё \(formatMinutes(m))"
     }
@@ -81,7 +80,9 @@ final class KeepAwake: NSObject, ObservableObject {
             title.isEnabled = false
             menu.addItem(title)
         }
-        if active {
+        // сколько осталось — только когда выбран срок
+        let timed = active && until != nil
+        if timed {
             let status = NSMenuItem(title: statusText, action: nil, keyEquivalent: "")
             status.isEnabled = false
             status.attributedTitle = NSAttributedString(string: status.title, attributes: [
@@ -90,7 +91,7 @@ final class KeepAwake: NSObject, ObservableObject {
             ])
             menu.addItem(status)
         }
-        if header || active { menu.addItem(.separator()) }
+        if header || timed { menu.addItem(.separator()) }
         for (i, o) in Self.options.enumerated() {
             let item = NSMenuItem(title: o.title, action: #selector(pick(_:)), keyEquivalent: "")
             item.target = self
