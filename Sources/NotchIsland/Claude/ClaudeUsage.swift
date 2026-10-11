@@ -37,7 +37,7 @@ final class ClaudeUsage: ObservableObject {
     /// Идёт запрос к серверу — кнопка «обновить» ждёт
     @Published private(set) var fetching = false
     private var nextFetch = Date()
-    /// Сервер отказал в доступе — не долбим его, пока вход не сменится
+    /// Сервер отказал в доступе или вход уже не обновить — не долбим сервер, пока вход не сменится
     private var blockedToken: String?
     /// Сервер попросил подождать — до этого времени не спрашиваем, даже по кнопке
     private var waitUntil: Date?
@@ -94,7 +94,9 @@ final class ClaudeUsage: ObservableObject {
         SecItemDelete(q as CFDictionary)
     }
 
+    /// Аккаунта нет — цифр тоже нет: прежние уже не обновятся, и карточка ведёт в настройки
     func window(_ w: ClaudeWidget) -> UsageWindow? {
+        guard !needsAccount else { return nil }
         switch w {
         case .session: return fiveHour
         case .week: return sevenDay
@@ -137,10 +139,12 @@ final class ClaudeUsage: ObservableObject {
         if case .waiting = login { finishLogin() }
         if blockedToken == creds.accessToken { return }
         do {
-            if creds.expiresAt.timeIntervalSinceNow < 60 { creds = try await ClaudeCodeLogin.refresh(creds) }
+            if creds.expiresAt.timeIntervalSinceNow < ClaudeCodeLogin.refreshMargin {
+                creds = try await ClaudeCodeLogin.refresh(creds)
+            }
             var (status, json, retry) = try await requestUsage(creds.accessToken)
             if status == 401 {
-                creds = try await ClaudeCodeLogin.refresh(creds)
+                creds = try await ClaudeCodeLogin.refresh(creds, force: true)
                 (status, json, retry) = try await requestUsage(creds.accessToken)
             }
             switch status {
@@ -165,8 +169,13 @@ final class ClaudeUsage: ObservableObject {
                 apiError = ((json["error"] as? [String: Any])?["message"] as? String) ?? L("Ошибка сервера (HTTP %@)", String(status))
             }
         } catch ClaudeCodeLogin.RefreshError.expired {
+            // этот вход уже не обновить — ждём новый (Claude Code или кнопка «Войти»), не долбим сервер
+            blockedToken = creds.accessToken
             authLost = true
             apiError = L("Вход устарел, нужно войти заново")
+        } catch ClaudeCodeLogin.RefreshError.busy {
+            // вход обновляет Claude Code — скоро прочитаем его новые токены
+            nextFetch = Date().addingTimeInterval(5)
         } catch ClaudeCodeLogin.RefreshError.network(let m) {
             apiError = m
         } catch let e as URLError where e.code == .timedOut || e.code == .cannotConnectToHost {

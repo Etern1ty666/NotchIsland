@@ -62,14 +62,14 @@ struct IslandView: View {
             Group {
                 if state.showSettings {
                     SettingsView(usage: usage, clip: clip, stats: stats, statsSettings: statsSettings,
-                                 awake: awake, updater: updater)
+                                 awake: awake, updater: updater, anchor: state.settingsAnchor)
                 } else {
                     switch state.tab {
                     case .clipboard:
                         ClipboardTab(clip: clip, expanded: state.expanded)
                     case .stats:
                         StatsTab(stats: stats, settings: statsSettings, usage: usage,
-                                 openSettings: { openSettings(true) })
+                                 openSettings: { openSettings(true, at: SettingsView.claudeAccount) })
                     }
                 }
             }
@@ -94,7 +94,8 @@ struct IslandView: View {
         }
     }
 
-    func openSettings(_ open: Bool) {
+    func openSettings(_ open: Bool, at anchor: String? = nil) {
+        state.settingsAnchor = anchor
         withAnimation(.spring(response: 0.3, dampingFraction: 0.85)) { state.showSettings = open }
     }
 

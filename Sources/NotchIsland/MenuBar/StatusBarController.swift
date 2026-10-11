@@ -27,8 +27,8 @@ final class StatusBarController: NSObject, NSMenuDelegate {
     var bag = Set<AnyCancellable>()
     /// Чьё это меню — по нему menuNeedsUpdate решает, что показать
     var menuKinds: [ObjectIdentifier: MenuKind] = [:]
-    /// «Настройки…» — раскрыть остров на настройках
-    var openSettings: (() -> Void)?
+    /// «Настройки…» — раскрыть остров на настройках; со строкой — прокрутить к ней
+    var openSettings: ((String?) -> Void)?
 
     init(stats: SystemStats, statsSettings: StatsSettings, usage: ClaudeUsage, awake: KeepAwake) {
         self.stats = stats

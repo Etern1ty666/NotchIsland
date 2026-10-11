@@ -1,8 +1,10 @@
 import SwiftUI
 
 /// Прокрутка без полосы: пока ниже есть ещё содержимое, нижний край растворяется
-/// и висит стрелка вниз — по клику прокручивает до конца
+/// и висит стрелка вниз — по клику прокручивает до конца. scrollTo — id строки, к которой прокрутить
+/// при появлении (и плавно — если сменится, пока страница открыта)
 struct FadingScrollView<Content: View>: View {
+    var scrollTo: String? = nil
     @ViewBuilder let content: () -> Content
     @State private var moreBelow = false
     @State private var hover = false
@@ -25,6 +27,15 @@ struct FadingScrollView<Content: View>: View {
                     })
                 }
                 .coordinateSpace(name: "fadingScroll")
+                .onAppear {
+                    // после первой раскладки — иначе прокручивать ещё нечего
+                    guard let scrollTo else { return }
+                    DispatchQueue.main.async { proxy.scrollTo(scrollTo, anchor: .center) }
+                }
+                .onChange(of: scrollTo) { target in
+                    guard let target else { return }
+                    withAnimation(.easeInOut(duration: 0.35)) { proxy.scrollTo(target, anchor: .center) }
+                }
                 // прокрутка только вверх-вниз: вбок страница не уезжает и не пружинит
                 .modifier(NoHorizontalBounce())
                 // низ растворяется чёрным поверх (остров чёрный): маска заставляла бы перерисовывать

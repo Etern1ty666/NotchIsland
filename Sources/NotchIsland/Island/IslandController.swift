@@ -191,8 +191,10 @@ final class IslandController: NSObject {
         if state.peeking { state.peeking = false }
     }
 
-    /// «Настройки…» в меню значка: раскрываем остров сразу на настройках. Ждём курсор до 10 секунд
-    func showSettings() {
+    /// «Настройки…» в меню значка: раскрываем остров сразу на настройках (прокрутив к anchor).
+    /// Ждём курсор до 10 секунд
+    func showSettings(at anchor: String? = nil) {
+        state.settingsAnchor = anchor
         state.showSettings = true
         expand()
         holdOpen = true

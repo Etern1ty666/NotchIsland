@@ -27,7 +27,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         self.controller = controller
         let statusBar = StatusBarController(stats: stats, statsSettings: statsSettings, usage: usage,
                                             awake: controller.awake)
-        statusBar.openSettings = { [weak controller] in controller?.showSettings() }
+        statusBar.openSettings = { [weak controller] in controller?.showSettings(at: $0) }
         self.statusBar = statusBar
 
         // новая версия — полоса с кнопкой и прогрессом внизу острова

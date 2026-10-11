@@ -97,7 +97,7 @@ extension StatusBarController {
         statsSettings.toggle(w)
     }
 
-    @objc func showSettings() { openSettings?() }
+    @objc func showSettings() { openSettings?(nil) }
 
     @objc func hideAppIcon() { statsSettings.showAppIcon = false }
 
@@ -106,7 +106,7 @@ extension StatusBarController {
     /// Включаем аккаунт или запускаем вход и показываем, как идёт подключение, — в настройках острова
     @objc func connectClaude() {
         usage.connect()
-        openSettings?()
+        openSettings?(SettingsView.claudeAccount)
     }
 
     @objc func openActivityMonitor(_ sender: NSMenuItem) {

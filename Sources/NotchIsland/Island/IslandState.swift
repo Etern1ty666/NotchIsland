@@ -10,6 +10,8 @@ final class IslandState: ObservableObject {
     @Published var notch = CGSize(width: 180, height: 32)
     /// Открыта страница настроек (шестерёнка справа от zzz) — вместо вкладки
     @Published var showSettings = false
+    /// К какой строке прокрутить открывшиеся настройки (например, `SettingsView.claudeAccount`); nil — с начала
+    @Published var settingsAnchor: String?
     /// После установки и каждого обновления вокруг выреза пульсирует зелёное свечение — «курсор сюда».
     /// Гаснет, когда остров раскроют
     @Published var showHint = UserDefaults.standard.string(forKey: DefaultsKey.islandHintVersion) != Updater.currentVersion

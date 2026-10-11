@@ -12,10 +12,15 @@ struct SettingsView: View {
     @ObservedObject var awake: KeepAwake
     /// Не @ObservedObject: за прогрессом следит UpdateStatus — страница не перерисовывается на каждый байт
     let updater: Updater
+    /// К какой строке прокрутить при открытии
+    var anchor: String?
     @ObservedObject var loginItem = LoginItem.shared
 
+    /// Строка «Аккаунт Claude» — сюда ведут карточки и значки Claude без входа
+    static let claudeAccount = "claudeAccount"
+
     var body: some View {
-        FadingScrollView {
+        FadingScrollView(scrollTo: anchor) {
             VStack(alignment: .leading, spacing: 8) {
                 SectionHeader(icon: "list.clipboard", title: "Буфер обмена")
                 SettingsRow(icon: "clock.arrow.circlepath", title: "Хранить историю") {
@@ -40,6 +45,7 @@ struct SettingsView: View {
                 SettingsRow(icon: loginIcon, iconColor: loginColor, title: "Аккаунт Claude", help: loginStatus) {
                     loginButtons
                 }
+                .id(Self.claudeAccount)
 
                 section("Приложение", icon: "macwindow")
                 SettingsRow(icon: "power", title: "Запускать при входе",
