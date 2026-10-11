@@ -27,13 +27,13 @@ struct FadingScrollView<Content: View>: View {
                 .coordinateSpace(name: "fadingScroll")
                 // прокрутка только вверх-вниз: вбок страница не уезжает и не пружинит
                 .modifier(NoHorizontalBounce())
-                .mask {
-                    VStack(spacing: 0) {
-                        Color.black
-                        LinearGradient(colors: [.black, .black.opacity(moreBelow ? 0 : 1)],
-                                       startPoint: .top, endPoint: .bottom)
-                            .frame(height: 36)
-                    }
+                // низ растворяется чёрным поверх (остров чёрный): маска заставляла бы перерисовывать
+                // всё содержимое отдельным проходом при каждой подсветке под курсором
+                .overlay(alignment: .bottom) {
+                    LinearGradient(colors: [.black.opacity(0), .black], startPoint: .top, endPoint: .bottom)
+                        .frame(height: 36)
+                        .opacity(moreBelow ? 1 : 0)
+                        .allowsHitTesting(false)
                 }
                 .overlay(alignment: .bottom) {
                     if moreBelow {

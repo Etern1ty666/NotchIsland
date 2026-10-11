@@ -141,8 +141,9 @@ struct ClipCard: View {
     // Текст, ссылка или файлы
     var plain: some View {
         HStack(spacing: 8) {
-            if item.isLink {
-                Image(systemName: "link")
+            // ссылка — цепочка, файлы — лист (несколько — стопка)
+            if item.isLink || item.kind == .files {
+                Image(systemName: item.isLink ? "link" : (item.urls.count > 1 ? "doc.on.doc" : "doc"))
                     .font(.system(size: 11, weight: .semibold))
                     .foregroundStyle(Color.white.opacity(0.45))
             }

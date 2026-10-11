@@ -22,26 +22,29 @@ struct IslandView: View {
         let h: CGFloat = ex ? state.expandedHeight : state.notch.height + (peek ? Metrics.peek.height : 0)
         let shape = IslandShape(top: flare, bottom: ex ? 24 : (peek ? 12 : 10))
 
-        shape.fill(Color.black)
-            .frame(width: bodyW + 2 * flare, height: h)
-            .overlay(alignment: .top) {
-                // содержимое при сворачивании гаснет быстрее формы — не сплющивается
-                panelContent
-                    .frame(width: Metrics.expanded.width, height: state.expandedHeight, alignment: .top)
-                    .opacity(ex ? 1 : 0)
-                    .scaleEffect(ex ? 1 : 0.94, anchor: .top)
-                    .animation(ex ? Metrics.spring : .easeOut(duration: 0.15), value: ex)
-                    .allowsHitTesting(ex)
+        ZStack(alignment: .top) {
+            // тень — только у фона, отдельным слоем: иначе любая подсветка внутри заставляла
+            // пересчитывать размытую тень всего острова, и наведение подтормаживало
+            shape.fill(Color.black)
+                .shadow(color: Color.black.opacity(ex ? 0.45 : 0), radius: 14, y: 6)
+            // содержимое при сворачивании гаснет быстрее формы — не сплющивается
+            panelContent
+                .frame(width: Metrics.expanded.width, height: state.expandedHeight, alignment: .top)
+                .opacity(ex ? 1 : 0)
+                .scaleEffect(ex ? 1 : 0.94, anchor: .top)
+                .animation(ex ? Metrics.spring : .easeOut(duration: 0.15), value: ex)
+                .allowsHitTesting(ex)
+                .frame(width: bodyW + 2 * flare, height: h, alignment: .top)
+                .clipShape(shape)
+        }
+        .frame(width: bodyW + 2 * flare, height: h)
+        // после установки и обновления: зелёное свечение вокруг выреза, пока остров не раскроют
+        .background(alignment: .top) {
+            if state.showHint && !ex {
+                HintGlow(size: CGSize(width: bodyW + 2 * flare, height: h))
             }
-            .clipShape(shape)
-            // после установки и обновления: зелёное свечение вокруг выреза, пока остров не раскроют
-            .background(alignment: .top) {
-                if state.showHint && !ex {
-                    HintGlow(size: CGSize(width: bodyW + 2 * flare, height: h))
-                }
-            }
-            .shadow(color: Color.black.opacity(ex ? 0.45 : 0), radius: 14, y: 6)
-            .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
+        }
+        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
             .ignoresSafeArea()
             .foregroundStyle(.white)
             .environment(\.colorScheme, .dark)
