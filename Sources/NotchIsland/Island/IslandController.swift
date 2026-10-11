@@ -41,7 +41,7 @@ final class IslandController: NSObject {
 
         // корень на языке системы: сменили язык — остров строится заново на новом
         let state = self.state, clip = self.clip, awake = self.awake
-        let host = NSHostingView(rootView: LocalizedRoot {
+        let host = TrackingHostingView(rootView: LocalizedRoot {
             IslandView(state: state, clip: clip, awake: awake,
                        stats: stats, statsSettings: statsSettings, usage: usage, updater: updater)
         })

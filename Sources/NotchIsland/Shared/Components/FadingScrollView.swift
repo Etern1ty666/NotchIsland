@@ -25,6 +25,8 @@ struct FadingScrollView<Content: View>: View {
                     })
                 }
                 .coordinateSpace(name: "fadingScroll")
+                // прокрутка только вверх-вниз: вбок страница не уезжает и не пружинит
+                .modifier(NoHorizontalBounce())
                 .mask {
                     VStack(spacing: 0) {
                         Color.black
@@ -59,5 +61,16 @@ struct FadingScrollView<Content: View>: View {
     private func update(_ bottom: CGFloat, visible: CGFloat) {
         let more = bottom > visible + 2
         if more != moreBelow { withAnimation(.easeOut(duration: 0.2)) { moreBelow = more } }
+    }
+}
+
+/// Пружина прокрутки — только когда содержимое больше окна (macOS 13.3+): не тянется вбок
+struct NoHorizontalBounce: ViewModifier {
+    func body(content: Content) -> some View {
+        if #available(macOS 13.3, *) {
+            content.scrollBounceBehavior(.basedOnSize)
+        } else {
+            content
+        }
     }
 }

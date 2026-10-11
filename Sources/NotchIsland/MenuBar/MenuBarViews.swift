@@ -40,17 +40,20 @@ struct MenuBarStat: View {
         case .network:
             // две строчки мелко: отдача сверху, загрузка снизу. Колонки: стрелки, числа по правому
             // краю, единицы по левому — всё на одном уровне, как бы ни менялись цифры
+            // колонки — постоянной ширины (под «88,8» и «МБ/с»): ширина значка не скачет, «/с» на одном уровне
             let up = bytesParts(stats.netOut), down = bytesParts(stats.netIn)
-            Grid(alignment: .leading, horizontalSpacing: 3, verticalSpacing: -1) {
+            let numberWidest = Localizer.shared.isRussian ? "88,8" : "88.8"
+            let unitWidest = ["КБ", "МБ", "ГБ"].map { L($0) + L("/с") }
+            Grid(alignment: .trailing, horizontalSpacing: 3, verticalSpacing: -1) {
                 GridRow {
                     Text("↑")
-                    Text(up.number).gridColumnAlignment(.trailing)
-                    Text(up.unit + L("/с"))
+                    widest(up.number, [numberWidest])
+                    widest(up.unit + L("/с"), unitWidest)
                 }
                 GridRow {
                     Text("↓")
-                    Text(down.number)
-                    Text(down.unit + L("/с"))
+                    widest(down.number, [numberWidest])
+                    widest(down.unit + L("/с"), unitWidest)
                 }
             }
             .font(.system(size: 9, weight: .semibold, design: .rounded).monospacedDigit())
@@ -59,12 +62,20 @@ struct MenuBarStat: View {
         }
     }
 
+    /// Текст в рамке ширины самого длинного из образцов, по правому краю
+    func widest(_ text: String, _ samples: [String]) -> some View {
+        ZStack(alignment: .trailing) {
+            ForEach(samples, id: \.self) { Text($0).hidden() }
+            Text(text)
+        }
+    }
+
     /// Батарейка, залитая по заряду, с процентами на ней (и молнией при зарядке); рядом — сколько осталось
     var battery: some View {
         let b = stats.battery
         return HStack(spacing: 5) {
             BatteryGlyph(level: b?.level ?? 0, charging: b?.charging ?? false, color: stats.color(.battery))
-                .frame(width: 34, height: 14)
+                .frame(width: 36, height: 16)
             if let m = b?.minutesLeft, b?.charging == true || b?.onAC == false {
                 Text(shortDuration(minutes: m))
                     .font(.system(size: 11, weight: .semibold, design: .rounded).monospacedDigit())
@@ -89,7 +100,7 @@ struct BatteryGlyph: View {
             GeometryReader { g in
                 let fill = g.size.width * CGFloat(min(max(level, 0), 1))
                 ZStack(alignment: .leading) {
-                    shape.fill(Color.white.opacity(0.35))
+                    shape.fill(Color.white.opacity(0.22))
                     Rectangle().fill(fillColor).frame(width: fill)
                     label.foregroundStyle(Color.white)
                     label.foregroundStyle(Color.black.opacity(0.85))
@@ -98,7 +109,7 @@ struct BatteryGlyph: View {
                 .clipShape(shape)
             }
             RoundedRectangle(cornerRadius: 1, style: .continuous)
-                .fill(Color.white.opacity(0.35))
+                .fill(Color.white.opacity(0.3))
                 .frame(width: 2, height: 5)
         }
     }
@@ -110,9 +121,9 @@ struct BatteryGlyph: View {
 
     var label: some View {
         HStack(spacing: 0.5) {
-            if charging { Image(systemName: "bolt.fill").font(.system(size: 7, weight: .black)) }
+            if charging { Image(systemName: "bolt.fill").font(.system(size: 8, weight: .black)) }
             Text("\(Int((level * 100).rounded()))")
-                .font(.system(size: 9.5, weight: .bold, design: .rounded).monospacedDigit())
+                .font(.system(size: 11, weight: .heavy, design: .rounded).monospacedDigit())
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
     }

@@ -84,7 +84,8 @@ struct ClipActionButton: View {
 struct ClipCard: View {
     /// Высота карточки со снимком; ширина — по пропорциям снимка, но в этих пределах
     static let visualHeight: CGFloat = 96
-    static let visualWidth: ClosedRange<CGFloat> = 60...604
+    /// Сверху — не шире 2,5 высоты: длинные снимки обрезаются по краям, а не тянутся на весь остров
+    static let visualWidth: ClosedRange<CGFloat> = 60...240
 
     let item: ClipItem
     let copied: Bool
