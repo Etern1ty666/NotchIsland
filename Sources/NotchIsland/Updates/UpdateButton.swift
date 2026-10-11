@@ -1,8 +1,7 @@
 import SwiftUI
 
-/// Зелёная кнопка внизу острова: «Обновить до 1.2»
+/// Зелёная кнопка внизу острова: «Доступно обновление»
 struct UpdateButton: View {
-    let version: String
     let action: () -> Void
     @State private var hover = false
 
@@ -11,7 +10,7 @@ struct UpdateButton: View {
             HStack(spacing: 6) {
                 Image(systemName: "arrow.down.circle.fill")
                     .font(.system(size: 12, weight: .bold))
-                Text("Обновить до \(version)")
+                Text("Доступно обновление")
                     .font(.system(size: 12, weight: .semibold))
             }
             .foregroundStyle(Color.black.opacity(0.85))
@@ -23,6 +22,6 @@ struct UpdateButton: View {
         .buttonStyle(.plain)
         .onHover { hover = $0 }
         .help("Поставить новую версию — приложение перезапустится")
-        .accessibilityLabel("Обновить до версии \(version)")
+        .accessibilityLabel("Доступно обновление")
     }
 }

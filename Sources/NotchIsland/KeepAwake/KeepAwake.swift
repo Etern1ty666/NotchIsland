@@ -5,7 +5,7 @@ import IOKit.pwr_mgt
 final class KeepAwake: NSObject, ObservableObject {
     /// Сроки в меню; nil — пока не выключат вручную
     static let options: [(title: String, minutes: Int?)] = [
-        ("На 30 минут", 30), ("На 1 час", 60), ("На 3 часа", 180), ("На 8 часов", 480), ("Пока не выключу", nil),
+        ("30 минут", 30), ("1 час", 60), ("3 часа", 180), ("8 часов", 480), ("Всегда", nil),
     ]
 
     @Published private(set) var active = false

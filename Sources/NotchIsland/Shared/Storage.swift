@@ -14,6 +14,8 @@ enum DefaultsKey {
     /// Статистики и окна лимитов Claude, закреплённые в строке меню
     static let menuStats = "menuStats"
     static let menuClaude = "menuClaude"
+    /// Брать лимиты Claude через вход Claude Code (в настройках можно отключить)
+    static let claudeAccount = "claudeAccountEnabled"
     /// Буфер: срок хранения истории
     static let clipRetention = "clipRetention"
     /// Автозапуск уже включали один раз после установки

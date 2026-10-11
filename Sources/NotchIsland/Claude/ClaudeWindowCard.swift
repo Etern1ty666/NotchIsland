@@ -37,6 +37,9 @@ struct ClaudeWindowCard: View {
 
     var detail: String {
         guard let window else {
+            if !usage.accountEnabled {
+                return usage.connection == .ours ? "Ждём цифры из терминала" : "Лимиты отключены — см. настройки"
+            }
             if let e = usage.apiError { return e }
             return usage.loggedIn ? "Загружаю…" : "Войди в Claude Code — см. настройки"
         }

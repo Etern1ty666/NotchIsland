@@ -5,10 +5,9 @@ struct SectionHeader: View {
     let title: String
 
     var body: some View {
-        // значок в рамке одной ширины — заголовки разделов начинаются на одной линии
-        HStack(spacing: 6) {
-            Image(systemName: icon).frame(width: 16)
+        HStack(spacing: 5) {
             Text(title)
+            Image(systemName: icon)
         }
         .font(.system(size: 11, weight: .semibold))
         .foregroundStyle(Color.white.opacity(0.45))

@@ -24,6 +24,9 @@ final class ClaudeUsage: ObservableObject {
     @Published private(set) var connection: Connection = .none
     /// Вход Claude Code есть в связке ключей
     @Published private(set) var loggedIn = false
+    /// Брать лимиты через вход Claude Code. «Отключить» в настройках только перестаёт спрашивать
+    /// сервер — из самого Claude Code не выходим, терминал продолжает работать
+    @Published private(set) var accountEnabled = UserDefaults.standard.object(forKey: DefaultsKey.claudeAccount) as? Bool ?? true
     /// Кнопка «Войти»: запускаем `claude auth login` сами, пользователю остаётся войти в браузере
     @Published private(set) var login: LoginState = .idle
     private var loginProcess: Process?
@@ -134,7 +137,7 @@ final class ClaudeUsage: ObservableObject {
     }
 
     func fetch() async {
-        guard !fetching else { return }
+        guard accountEnabled, !fetching else { return }
         fetching = true
         defer { fetching = false }
         nextFetch = Date().addingTimeInterval(Self.pollInterval)
@@ -280,6 +283,22 @@ final class ClaudeUsage: ObservableObject {
             login = .waiting(nil)
         } catch {
             login = .failed(error.localizedDescription)
+        }
+    }
+
+    /// Подключить или отключить аккаунт. Без него остаются только цифры из строки состояния терминала
+    func setAccountEnabled(_ on: Bool) {
+        accountEnabled = on
+        UserDefaults.standard.set(on, forKey: DefaultsKey.claudeAccount)
+        apiError = nil
+        if on {
+            fetchNow()
+        } else {
+            fiveHour = nil
+            sevenDay = nil
+            updatedAt = nil
+            fileDate = nil
+            reload()
         }
     }
 

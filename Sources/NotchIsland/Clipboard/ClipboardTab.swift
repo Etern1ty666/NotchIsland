@@ -11,7 +11,7 @@ struct ClipboardTab: View {
     var body: some View {
         FadingScrollView {
             if clip.items.isEmpty {
-                ClipTips(retention: clip.retention)
+                ClipTips()
             } else {
                 clipGrid(clip.items)
             }
