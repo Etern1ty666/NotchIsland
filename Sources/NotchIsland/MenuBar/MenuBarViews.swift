@@ -83,6 +83,11 @@ struct MenuBarAwake: View {
     @ObservedObject var awake: KeepAwake
 
     var body: some View {
+        // выключен — пусто: значок сжат в ноль, но держит место в строке меню
+        if awake.active { pill }
+    }
+
+    var pill: some View {
         HStack(spacing: 4) {
             SleepIcon(slashed: true, size: 11, background: Theme.menuBarPill)
             // выбран срок — рядом обратный отсчёт; ширина под две цифры, чтобы соседи не прыгали

@@ -10,7 +10,7 @@ final class IslandState: ObservableObject {
     }
     /// Размер выреза (или его имитации на экране без выреза)
     @Published var notch = CGSize(width: 180, height: 32)
-    /// Открыта страница настроек (шестерёнка слева от zzz) — вместо вкладки
+    /// Открыта страница настроек (шестерёнка справа от zzz) — вместо вкладки
     @Published var showSettings = false
     /// Скачана или найдена новая версия («1.2») — внизу острова кнопка «Обновить»
     @Published var updateVersion: String?

@@ -29,12 +29,13 @@ final class StatusBarController: NSObject, NSMenuDelegate {
         self.updater = updater
         super.init()
 
-        // macOS ставит каждый новый значок левее предыдущих, поэтому создаём справа налево.
+        // macOS ставит каждый новый значок левее предыдущих, поэтому создаём справа налево:
+        // «Держать экран включенным» — первым, он всегда крайний справа среди наших.
         // autosaveName запоминает, куда пользователь перетащил значок с ⌘
+        awakeItem = makeItem("awake.right", content: MenuBarAwake(awake: awake))
         appItem = makeItem("app")
         appItem?.button?.image = Self.makeMenuBarIcon()
         appItem?.button?.toolTip = "NotchIsland"
-        awakeItem = makeItem("awake", content: MenuBarAwake(awake: awake))
         for w in ClaudeWidget.allCases.reversed() {
             let item = makeItem("claude.\(w.rawValue)", content: MenuBarClaude(widget: w, usage: usage))
             item.length = ceil(measure(w) + 9)   // запас под двузначные проценты
@@ -121,11 +122,14 @@ final class StatusBarController: NSObject, NSMenuDelegate {
         for (w, item) in claudeItems {
             item.isVisible = statsSettings.pinnedClaude.contains(w)
         }
-        awakeItem?.isVisible = awake.active
-        awakeItem?.button?.toolTip = awake.statusText
-        awakeItem?.length = ceil(NSHostingView(rootView: MenuBarAwake(awake: awake)).fittingSize.width + 6)
+        // значок режима не прячем, а сжимаем в ноль: так он держит своё место крайним справа.
+        // Спрятанный и снова показанный значок macOS ставит левее всех наших
+        awakeItem?.isVisible = true
+        awakeItem?.button?.toolTip = awake.active ? awake.statusText : nil
+        awakeItem?.length = awake.active
+            ? ceil(NSHostingView(rootView: MenuBarAwake(awake: awake)).fittingSize.width + 6) : 0
         appItem?.isVisible = !statItems.values.contains { $0.isVisible }
-            && !claudeItems.values.contains { $0.isVisible } && awakeItem?.isVisible != true
+            && !claudeItems.values.contains { $0.isVisible } && !awake.active
         statsDidUpdate()
         claudeDidUpdate()
     }
