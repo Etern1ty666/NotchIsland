@@ -13,10 +13,12 @@ final class IslandController: NSObject {
     private var collapseWork: DispatchWorkItem?
     /// Открыто выпадающее меню — курсор может уйти за край острова, сворачивать нельзя
     private var menuOpen = false
+    /// Остров открыли из меню в строке меню: курсор ещё там — не сворачиваем, пока он не дойдёт до острова
+    private var holdOpen = false
     /// Проверка курсора уже запланирована — события мыши идут пачками, хватит одной на пачку
     private var movePending = false
 
-    init(stats: SystemStats, statsSettings: StatsSettings, usage: ClaudeUsage) {
+    init(stats: SystemStats, statsSettings: StatsSettings, usage: ClaudeUsage, updater: Updater) {
         screen = Self.pickScreen() ?? NSScreen.screens[0]
         panel = IslandPanel(contentRect: .zero, styleMask: [.borderless, .nonactivatingPanel],
                             backing: .buffered, defer: false)
@@ -38,7 +40,8 @@ final class IslandController: NSObject {
         panel.acceptsMouseMovedEvents = true
 
         let host = NSHostingView(rootView: IslandView(state: state, clip: clip, awake: awake,
-                                                     stats: stats, statsSettings: statsSettings, usage: usage))
+                                                     stats: stats, statsSettings: statsSettings, usage: usage,
+                                                     updater: updater))
         host.sizingOptions = []
         if #available(macOS 13.3, *) { host.safeAreaRegions = [] }
         panel.contentView = host
@@ -118,7 +121,8 @@ final class IslandController: NSObject {
     func mouseMoved() {
         let p = NSEvent.mouseLocation
         if state.expanded {
-            if expandedHit.contains(p) || menuOpen {
+            if expandedHit.contains(p) { holdOpen = false }
+            if expandedHit.contains(p) || menuOpen || holdOpen {
                 collapseWork?.cancel()
                 collapseWork = nil
             } else if collapseWork == nil {
@@ -182,6 +186,18 @@ final class IslandController: NSObject {
         expandWork?.cancel()
         expandWork = nil
         if state.peeking { state.peeking = false }
+    }
+
+    /// «Настройки…» в меню значка: раскрываем остров сразу на настройках. Ждём курсор до 10 секунд
+    func showSettings() {
+        state.showSettings = true
+        expand()
+        holdOpen = true
+        DispatchQueue.main.asyncAfter(deadline: .now() + 10) { [weak self] in
+            guard let self, self.holdOpen else { return }
+            self.holdOpen = false
+            self.mouseMoved()
+        }
     }
 
     func expand() {

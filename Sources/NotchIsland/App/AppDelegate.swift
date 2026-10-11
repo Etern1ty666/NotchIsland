@@ -21,12 +21,14 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             Installer.enableAutostartOnce()
         }
 
-        let controller = IslandController(stats: stats, statsSettings: statsSettings, usage: usage)
-        self.controller = controller
         let updater = Updater()
         self.updater = updater
-        statusBar = StatusBarController(stats: stats, statsSettings: statsSettings, usage: usage,
-                                        awake: controller.awake, updater: updater)
+        let controller = IslandController(stats: stats, statsSettings: statsSettings, usage: usage, updater: updater)
+        self.controller = controller
+        let statusBar = StatusBarController(stats: stats, statsSettings: statsSettings, usage: usage,
+                                            awake: controller.awake)
+        statusBar.openSettings = { [weak controller] in controller?.showSettings() }
+        self.statusBar = statusBar
 
         // новая версия — зелёная кнопка внизу острова
         let state = controller.state

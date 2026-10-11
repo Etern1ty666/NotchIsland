@@ -8,6 +8,7 @@ struct IslandView: View {
     let stats: SystemStats
     let statsSettings: StatsSettings
     let usage: ClaudeUsage
+    let updater: Updater
 
     @Namespace private var tabNS
 
@@ -49,7 +50,8 @@ struct IslandView: View {
             topBar
             Group {
                 if state.showSettings {
-                    SettingsView(usage: usage, clip: clip)
+                    SettingsView(usage: usage, clip: clip, stats: stats, statsSettings: statsSettings,
+                                 awake: awake, updater: updater)
                 } else {
                     switch state.tab {
                     case .clipboard:

@@ -11,8 +11,8 @@ final class KeepAwake: NSObject, ObservableObject {
     @Published private(set) var active = false
     /// Когда режим выключится сам; nil — держится, пока не выключат
     @Published private(set) var until: Date?
-    /// Какой срок выбран — для галочки в меню
-    private var chosen: Int?
+    /// Какой срок выбран (номер в options) — для галочки в меню и переключателя в настройках
+    @Published private(set) var chosen: Int?
     private var assertionID: IOPMAssertionID = 0
     private var timer: Timer?
 
@@ -113,10 +113,13 @@ final class KeepAwake: NSObject, ObservableObject {
         }
     }
 
-    @objc private func pick(_ sender: NSMenuItem) {
-        enable(minutes: Self.options[sender.tag].minutes)
-        if active { chosen = sender.tag }
+    /// Включить на срок из options (по номеру)
+    func choose(_ index: Int) {
+        enable(minutes: Self.options[index].minutes)
+        if active { chosen = index }
     }
+
+    @objc private func pick(_ sender: NSMenuItem) { choose(sender.tag) }
 
     @objc private func turnOff() { disable() }
 }

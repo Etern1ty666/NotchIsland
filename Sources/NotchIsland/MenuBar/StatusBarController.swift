@@ -10,7 +10,6 @@ final class StatusBarController: NSObject, NSMenuDelegate {
     let statsSettings: StatsSettings
     let usage: ClaudeUsage
     let awake: KeepAwake
-    let updater: Updater
     /// Каждая статистика — свой значок в строке меню
     var statItems: [Stat: NSStatusItem] = [:]
     /// Лимиты подписки Claude — тоже по значку на окно
@@ -22,13 +21,14 @@ final class StatusBarController: NSObject, NSMenuDelegate {
     var bag = Set<AnyCancellable>()
     /// Чьё это меню — по нему menuNeedsUpdate решает, что показать
     var menuKinds: [ObjectIdentifier: MenuKind] = [:]
+    /// «Настройки…» — раскрыть остров на настройках
+    var openSettings: (() -> Void)?
 
-    init(stats: SystemStats, statsSettings: StatsSettings, usage: ClaudeUsage, awake: KeepAwake, updater: Updater) {
+    init(stats: SystemStats, statsSettings: StatsSettings, usage: ClaudeUsage, awake: KeepAwake) {
         self.stats = stats
         self.statsSettings = statsSettings
         self.usage = usage
         self.awake = awake
-        self.updater = updater
         super.init()
 
         // macOS ставит каждый новый значок левее предыдущих, поэтому создаём справа налево:
