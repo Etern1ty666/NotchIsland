@@ -79,26 +79,15 @@ final class KeepAwake: NSObject, ObservableObject {
         return menu
     }
 
-    /// Пункты меню сроков — в готовое меню. header — с названием режима и остатком времени
-    /// (у кнопки zzz на острове); в строке меню — только сроки
+    /// Пункты меню сроков — в готовое меню. header — с названием режима (у кнопки zzz на острове);
+    /// в строке меню — только сроки
     func fill(_ menu: NSMenu, header: Bool) {
         if header {
             let title = NSMenuItem(title: Self.title, action: nil, keyEquivalent: "")
             title.isEnabled = false
             menu.addItem(title)
+            menu.addItem(.separator())
         }
-        // сколько осталось — только когда выбран срок и только вместе с заголовком
-        let timed = header && active && until != nil
-        if timed {
-            let status = NSMenuItem(title: statusText, action: nil, keyEquivalent: "")
-            status.isEnabled = false
-            status.attributedTitle = NSAttributedString(string: status.title, attributes: [
-                .font: NSFont.menuFont(ofSize: NSFont.smallSystemFontSize),
-                .foregroundColor: NSColor.secondaryLabelColor,
-            ])
-            menu.addItem(status)
-        }
-        if header || timed { menu.addItem(.separator()) }
         for (i, o) in Self.options.enumerated() {
             let item = NSMenuItem(title: o.title, action: #selector(pick(_:)), keyEquivalent: "")
             item.target = self

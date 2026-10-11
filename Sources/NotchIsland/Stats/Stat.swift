@@ -23,6 +23,10 @@ final class StatsSettings: ObservableObject {
     @Published var pinnedClaude: Set<ClaudeWidget> {
         didSet { UserDefaults.standard.set(pinnedClaude.map(\.rawValue), forKey: DefaultsKey.menuClaude) }
     }
+    /// Значок приложения, когда других наших значков нет; его меню — «Спрятать»
+    @Published var showAppIcon = UserDefaults.standard.object(forKey: DefaultsKey.menuAppIcon) as? Bool ?? true {
+        didSet { UserDefaults.standard.set(showAppIcon, forKey: DefaultsKey.menuAppIcon) }
+    }
 
     init() {
         // по умолчанию — процессор и диск: все пять значков на строке меню MacBook рядом

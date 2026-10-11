@@ -118,8 +118,8 @@ struct BatteryGlyph: View {
     }
 }
 
-/// Лимит подписки Claude в строке меню: слева в две строки — какое окно («5 ч» или «Нед») и сколько
-/// до сброса, дальше шкала расхода, значок и проценты
+/// Лимит подписки Claude в строке меню: шкала расхода, за ней в две строки — какое окно («5 ч» или
+/// «Нед») и сколько до сброса, дальше значок и проценты
 struct MenuBarClaude: View {
     let widget: ClaudeWidget
     @ObservedObject var usage: ClaudeUsage
@@ -127,14 +127,14 @@ struct MenuBarClaude: View {
     var body: some View {
         let w = usage.window(widget)
         HStack(spacing: 5) {
+            GaugeView(gauge: .bar(w?.spent ?? 0), color: claudeColor(w))
+                .frame(width: 24, height: 5)
             VStack(alignment: .leading, spacing: -1) {
                 Text(widget.menuBarLabel)
                 Text(resetShort(w))
             }
             .font(.system(size: 9, weight: .semibold, design: .rounded).monospacedDigit())
             .foregroundStyle(Color.white.opacity(0.55))
-            GaugeView(gauge: .bar(w?.spent ?? 0), color: claudeColor(w))
-                .frame(width: 24, height: 5)
             Image(systemName: "sparkles")
                 .font(.system(size: 11, weight: .semibold))
                 .foregroundStyle(Color.white.opacity(0.75))
@@ -168,7 +168,7 @@ struct MenuBarAwake: View {
     @ObservedObject var awake: KeepAwake
 
     var body: some View {
-        // выключен — пусто: значок сжат в ноль, но держит место в строке меню
+        // значок есть, только пока режим включён (StatusBarController)
         if awake.active { pill }
     }
 

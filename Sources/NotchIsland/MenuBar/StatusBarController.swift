@@ -3,21 +3,25 @@ import SwiftUI
 import Combine
 
 /// Значки в строке меню: статистики и лимиты Claude (какие закреплены), «Держать экран включенным»
-/// и обычная иконка приложения, когда больше ничего нашего нет. У каждого своё меню (StatusBarMenus)
+/// (пока режим включён) и значок приложения, когда больше ничего нашего нет (его тоже можно спрятать).
+/// Показываются только нужные: при каждом изменении набора значки создаются заново справа налево —
+/// так zzz всегда крайний справа среди наших и не остаётся пустых мест. У каждого своё меню (StatusBarMenus)
 @MainActor
 final class StatusBarController: NSObject, NSMenuDelegate {
     let stats: SystemStats
     let statsSettings: StatsSettings
     let usage: ClaudeUsage
     let awake: KeepAwake
-    /// Каждая статистика — свой значок в строке меню
+    /// Показанные значки статистик
     var statItems: [Stat: NSStatusItem] = [:]
-    /// Лимиты подписки Claude — тоже по значку на окно
+    /// Показанные лимиты подписки Claude — по значку на окно
     var claudeItems: [ClaudeWidget: NSStatusItem] = [:]
-    /// «Держать экран включенным» — отдельный значок, виден, пока режим включён
+    /// «Держать экран включенным» — пока режим включён
     var awakeItem: NSStatusItem?
-    /// Обычная иконка приложения — только когда в строке меню больше ничего нашего нет
+    /// Значок приложения — когда больше ничего нашего нет
     var appItem: NSStatusItem?
+    /// Какие значки сейчас показаны, справа налево
+    private var shown: [String] = []
     var bag = Set<AnyCancellable>()
     /// Чьё это меню — по нему menuNeedsUpdate решает, что показать
     var menuKinds: [ObjectIdentifier: MenuKind] = [:]
@@ -31,23 +35,6 @@ final class StatusBarController: NSObject, NSMenuDelegate {
         self.awake = awake
         super.init()
 
-        // macOS ставит каждый новый значок левее предыдущих, поэтому создаём справа налево:
-        // «Держать экран включенным» — первым, он всегда крайний справа среди наших.
-        // autosaveName запоминает, куда пользователь перетащил значок с ⌘
-        awakeItem = makeItem("awake.right", kind: .awake, content: MenuBarAwake(awake: awake))
-        appItem = makeItem("app", kind: .app)
-        appItem?.button?.image = Self.makeMenuBarIcon()
-        appItem?.button?.toolTip = "NotchIsland"
-        for w in ClaudeWidget.allCases.reversed() {
-            let item = makeItem("claude.\(w.rawValue)", kind: .claude(w), content: MenuBarClaude(widget: w, usage: usage))
-            item.length = ceil(measure(w) + 9)   // запас под двузначные проценты
-            claudeItems[w] = item
-        }
-        for s in Stat.allCases.reversed() {
-            let item = makeItem("stat.\(s.rawValue)", kind: .stat(s), content: MenuBarStat(stat: s, stats: stats))
-            item.length = ceil(measure(s) + reserve(s))
-            statItems[s] = item
-        }
         updateStatusItems()
 
         statsSettings.$pinned
@@ -55,6 +42,10 @@ final class StatusBarController: NSObject, NSMenuDelegate {
             .sink { [weak self] _ in self?.updateStatusItems() }
             .store(in: &bag)
         statsSettings.$pinnedClaude
+            .receive(on: DispatchQueue.main)
+            .sink { [weak self] _ in self?.updateStatusItems() }
+            .store(in: &bag)
+        statsSettings.$showAppIcon
             .receive(on: DispatchQueue.main)
             .sink { [weak self] _ in self?.updateStatusItems() }
             .store(in: &bag)
@@ -118,23 +109,56 @@ final class StatusBarController: NSObject, NSMenuDelegate {
     }
 
     func updateStatusItems() {
+        // справа налево: macOS ставит каждый новый значок левее предыдущих
+        var wanted: [String] = []
+        if awake.active { wanted.append("awake.right") }
+        for w in ClaudeWidget.allCases.reversed() where statsSettings.pinnedClaude.contains(w) {
+            wanted.append("claude.\(w.rawValue)")
+        }
         let available = stats.available
-        for (s, item) in statItems {
-            item.isVisible = statsSettings.pinned.contains(s) && available.contains(s)
+        for s in Stat.allCases.reversed() where statsSettings.pinned.contains(s) && available.contains(s) {
+            wanted.append("stat.\(s.rawValue)")
         }
-        for (w, item) in claudeItems {
-            item.isVisible = statsSettings.pinnedClaude.contains(w)
+        if wanted.isEmpty && statsSettings.showAppIcon { wanted = ["app"] }
+        if wanted != shown { rebuild(wanted) }
+
+        awakeItem?.button?.toolTip = awake.statusText
+        if let awakeItem {
+            awakeItem.length = ceil(NSHostingView(rootView: MenuBarAwake(awake: awake)).fittingSize.width + 6)
         }
-        // значок режима не прячем, а сжимаем в ноль: так он держит своё место крайним справа.
-        // Спрятанный и снова показанный значок macOS ставит левее всех наших
-        awakeItem?.isVisible = true
-        awakeItem?.button?.toolTip = awake.active ? awake.statusText : nil
-        awakeItem?.length = awake.active
-            ? ceil(NSHostingView(rootView: MenuBarAwake(awake: awake)).fittingSize.width + 6) : 0
-        appItem?.isVisible = !statItems.values.contains { $0.isVisible }
-            && !claudeItems.values.contains { $0.isVisible } && !awake.active
         statsDidUpdate()
         claudeDidUpdate()
+    }
+
+    /// Убираем все наши значки и создаём нужные заново, справа налево.
+    /// autosaveName запоминает, куда пользователь перетащил значок с ⌘
+    private func rebuild(_ wanted: [String]) {
+        let old = Array(statItems.values) + Array(claudeItems.values) + [awakeItem, appItem].compactMap { $0 }
+        old.forEach { NSStatusBar.system.removeStatusItem($0) }
+        statItems = [:]
+        claudeItems = [:]
+        awakeItem = nil
+        appItem = nil
+        menuKinds = [:]
+        for name in wanted {
+            if name == "awake.right" {
+                awakeItem = makeItem(name, kind: .awake, content: MenuBarAwake(awake: awake))
+            } else if name == "app" {
+                let item = makeItem(name, kind: .app)
+                item.button?.image = Self.makeMenuBarIcon()
+                item.button?.toolTip = "NotchIsland"
+                appItem = item
+            } else if let w = ClaudeWidget(rawValue: String(name.dropFirst("claude.".count))), name.hasPrefix("claude.") {
+                let item = makeItem(name, kind: .claude(w), content: MenuBarClaude(widget: w, usage: usage))
+                item.length = ceil(measure(w) + 9)   // запас под двузначные проценты
+                claudeItems[w] = item
+            } else if let s = Stat(rawValue: String(name.dropFirst("stat.".count))), name.hasPrefix("stat.") {
+                let item = makeItem(name, kind: .stat(s), content: MenuBarStat(stat: s, stats: stats))
+                item.length = ceil(measure(s) + reserve(s))
+                statItems[s] = item
+            }
+        }
+        shown = wanted
     }
 
     func claudeDidUpdate() {

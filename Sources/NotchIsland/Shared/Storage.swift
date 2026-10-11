@@ -12,6 +12,8 @@ enum DefaultsKey {
     /// Статистики и окна лимитов Claude, закреплённые в строке меню
     static let menuStats = "menuStats"
     static let menuClaude = "menuClaude"
+    /// Значок приложения в строке меню (когда других наших нет)
+    static let menuAppIcon = "menuAppIcon"
     /// Брать лимиты Claude через вход Claude Code (в настройках можно отключить)
     static let claudeAccount = "claudeAccountEnabled"
     /// Буфер: срок хранения истории

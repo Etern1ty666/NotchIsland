@@ -15,8 +15,8 @@ extension StatusBarController {
         menu.removeAllItems()
         switch menuKinds[ObjectIdentifier(menu)] ?? .app {
         case .app:
-            // значок приложения виден, только когда других нет: остаётся дорога в настройки
-            break
+            // значок приложения виден, только когда других нет; вернуть — в настройках, «Строка меню»
+            _ = addItem(to: menu, "Спрятать", #selector(hideAppIcon))
         case .awake:
             awake.fill(menu, header: false)
         case .stat(let s):
@@ -59,6 +59,8 @@ extension StatusBarController {
     }
 
     @objc func showSettings() { openSettings?() }
+
+    @objc func hideAppIcon() { statsSettings.showAppIcon = false }
 
     @objc func openActivityMonitor(_ sender: NSMenuItem) {
         guard let raw = sender.representedObject as? String, let s = Stat(rawValue: raw) else { return }

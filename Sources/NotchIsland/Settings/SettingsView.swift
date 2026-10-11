@@ -59,8 +59,8 @@ struct SettingsView: View {
 
     // MARK: Строка меню
 
-    /// Какие значки показывать в строке меню — плитками: ряд системы и ряд лимитов Claude,
-    /// каждая плитка во всю свою долю ширины; нажатие включает и выключает
+    /// Какие значки показывать в строке меню — плитками: ряд системы и ряд лимитов Claude со значком
+    /// приложения, каждая плитка во всю свою долю ширины; нажатие включает и выключает
     var menuBarItems: some View {
         VStack(spacing: 6) {
             HStack(spacing: 6) {
@@ -76,10 +76,13 @@ struct SettingsView: View {
                         statsSettings.toggle(w)
                     }
                 }
+                // значок приложения — виден, когда других наших значков нет
+                MenuBarToggle(icon: "switch.2", title: "NotchIsland", isOn: statsSettings.showAppIcon) {
+                    statsSettings.showAppIcon.toggle()
+                }
+                .help("Значок приложения — когда других значков нет")
             }
         }
-        .padding(8)
-        .cardBackground()
     }
 
     // MARK: Экран
@@ -187,7 +190,7 @@ struct MenuBarToggle: View {
             .frame(maxWidth: .infinity)
             .frame(height: 32)
             .background(RoundedRectangle(cornerRadius: 8, style: .continuous)
-                .fill(Color.white.opacity(isOn ? 0.16 : (hover ? 0.07 : 0.03))))
+                .fill(Color.white.opacity(isOn ? 0.16 : (hover ? 0.1 : 0.06))))
             .overlay(RoundedRectangle(cornerRadius: 8, style: .continuous)
                 .strokeBorder(Color.white.opacity(isOn ? 0.18 : 0), lineWidth: 1))
             .contentShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
