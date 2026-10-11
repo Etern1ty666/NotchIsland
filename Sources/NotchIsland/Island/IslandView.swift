@@ -38,9 +38,13 @@ struct IslandView: View {
                 .clipShape(shape)
         }
         .frame(width: bodyW + 2 * flare, height: h)
-        // после установки и обновления: зелёная линия по краю острова, пока его не раскроют
-        .overlay {
-            if state.showHint && !ex { HintGlow(shape: shape) }
+        // после установки и обновления: зелёная линия по краю острова, пока его не раскроют.
+        // Под островом (видна только снаружи, поверх содержимого не ложится) и исчезает сразу,
+        // без затухания, — пока остров раскрывается, её уже нет
+        .background {
+            if state.showHint && !ex {
+                HintGlow(shape: shape).transition(.identity)
+            }
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
             .ignoresSafeArea()
@@ -183,7 +187,8 @@ struct HintGlow: View {
     @State private var pulse = false
 
     var body: some View {
-        shape.stroke(Theme.ok, lineWidth: 2.5)
+        // половина линии — под чёрным островом, снаружи видна ровная полоса
+        shape.stroke(Theme.ok, lineWidth: 4)
             .shadow(color: Theme.ok.opacity(0.8), radius: pulse ? 5 : 2)
             .opacity(pulse ? 1 : 0.45)
             .allowsHitTesting(false)

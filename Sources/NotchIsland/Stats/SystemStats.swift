@@ -1,5 +1,6 @@
 import SwiftUI
 import AppKit
+import IOKit
 import IOKit.ps
 
 final class SystemStats: ObservableObject {
@@ -46,7 +47,7 @@ final class SystemStats: ObservableObject {
         sampleNetwork()
         sampleMemory()
         sampleDisk()
-        battery = Self.readBattery()
+        battery = Self.readBattery(previous: nil)
         // первый замер чуть раньше, чтобы цифры появились сразу после запуска
         DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) { [weak self] in self?.sample() }
         let t = Timer(timeInterval: 2, repeats: true) { [weak self] _ in self?.sample() }
@@ -60,7 +61,7 @@ final class SystemStats: ObservableObject {
         sampleMemory()
         sampleNetwork()
         tick += 1
-        if tick % 5 == 0 { battery = Self.readBattery() }   // раз в 10 с
+        if tick % 5 == 0 { battery = Self.readBattery(previous: battery) }   // раз в 10 с
         if tick % 15 == 0 { sampleDisk() }                   // раз в 30 с
     }
 
@@ -160,7 +161,33 @@ final class SystemStats: ObservableObject {
         diskFree = Double(v.volumeAvailableCapacityForImportantUsage ?? 0)
     }
 
-    static func readBattery() -> BatteryInfo? {
+    /// Сколько осталось, macOS иногда не знает («ещё считаю» — после пробуждения, отключения зарядки,
+    /// а то и посреди работы). Тогда держим прошлое значение, пока не сменилось питание, а если
+    /// его нет — спрашиваем контроллер батареи напрямую (оттуда же время берёт pmset)
+    static func readBattery(previous: BatteryInfo?) -> BatteryInfo? {
+        guard var b = readPowerSource() else { return nil }
+        if b.minutesLeft == nil {
+            if let previous, previous.charging == b.charging, previous.onAC == b.onAC {
+                b.minutesLeft = previous.minutesLeft
+            } else if b.charging || !b.onAC {
+                b.minutesLeft = smartBatteryMinutes(charging: b.charging)
+            }
+        }
+        return b
+    }
+
+    /// Среднее время до разряда (или до полной) у контроллера батареи; 65535 — «неизвестно»
+    private static func smartBatteryMinutes(charging: Bool) -> Int? {
+        let service = IOServiceGetMatchingService(kIOMainPortDefault, IOServiceMatching("AppleSmartBattery"))
+        guard service != 0 else { return nil }
+        defer { IOObjectRelease(service) }
+        let key = (charging ? "AvgTimeToFull" : "AvgTimeToEmpty") as CFString
+        guard let v = IORegistryEntryCreateCFProperty(service, key, kCFAllocatorDefault, 0)?
+                .takeRetainedValue() as? Int, v > 0, v < 65535 else { return nil }
+        return v
+    }
+
+    private static func readPowerSource() -> BatteryInfo? {
         guard let info = IOPSCopyPowerSourcesInfo()?.takeRetainedValue(),
               let list = IOPSCopyPowerSourcesList(info)?.takeRetainedValue() as? [CFTypeRef] else { return nil }
         for src in list {
