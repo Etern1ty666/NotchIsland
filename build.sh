@@ -31,6 +31,7 @@ build() {
   cp Resources/Info.plist "$APP/Contents/Info.plist"
   cp Resources/AppIcon.icns "$APP/Contents/Resources/AppIcon.icns"
   ditto "$SPARKLE/Sparkle.xcframework/macos-arm64_x86_64/Sparkle.framework" "$APP/Contents/Frameworks/Sparkle.framework"
+  chmod -R u+rwX,go+rX "$APP"   # файлы приложения читают все пользователи Mac
   codesign --force --deep --sign - "$APP"   # ad-hoc подпись, достаточно для локального использования
   echo "Собрано: $APP ($(/usr/libexec/PlistBuddy -c 'Print :CFBundleShortVersionString' Resources/Info.plist))"
 }

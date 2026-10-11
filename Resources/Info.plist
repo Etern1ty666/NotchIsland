@@ -2,29 +2,43 @@
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
 <plist version="1.0">
 <dict>
-    <key>CFBundleIdentifier</key><string>com.notchisland.app</string>
-    <key>CFBundleName</key><string>NotchIsland</string>
-    <key>CFBundleDisplayName</key><string>NotchIsland</string>
-    <key>CFBundleIconFile</key><string>AppIcon</string>
-    <key>CFBundleExecutable</key><string>NotchIsland</string>
-    <key>CFBundlePackageType</key><string>APPL</string>
-    <key>CFBundleShortVersionString</key><string>1.0</string>
-    <key>CFBundleVersion</key><string>1.0</string>
-    <key>LSMinimumSystemVersion</key><string>13.0</string>
-    <key>LSUIElement</key><true/>
-    <key>NSHighResolutionCapable</key><true/>
-    <key>NSDesktopFolderUsageDescription</key>
-    <string>Нужен, чтобы показывать последние скриншоты.</string>
-    <key>NSDocumentsFolderUsageDescription</key>
-    <string>Нужен, чтобы показывать последние скриншоты.</string>
-    <key>NSDownloadsFolderUsageDescription</key>
-    <string>Нужен, чтобы показывать последние скриншоты.</string>
-
-    <!-- Обновления (Sparkle): список версий, ключ проверки подписи, проверка раз в час, тихая загрузка -->
-    <key>SUFeedURL</key><string>https://31-76-54-191.sslip.io:9443/appcast.xml</string>
-    <key>SUPublicEDKey</key><string>JLibOArC/oBG1Q5za20yk1K4ieF4uI14RlvAplvk9V4=</string>
-    <key>SUEnableAutomaticChecks</key><true/>
-    <key>SUAutomaticallyUpdate</key><true/>
-    <key>SUScheduledCheckInterval</key><integer>3600</integer>
+	<key>CFBundleDisplayName</key>
+	<string>NotchIsland</string>
+	<key>CFBundleExecutable</key>
+	<string>NotchIsland</string>
+	<key>CFBundleIconFile</key>
+	<string>AppIcon</string>
+	<key>CFBundleIdentifier</key>
+	<string>com.notchisland.app</string>
+	<key>CFBundleName</key>
+	<string>NotchIsland</string>
+	<key>CFBundlePackageType</key>
+	<string>APPL</string>
+	<key>CFBundleShortVersionString</key>
+	<string>1.1</string>
+	<key>CFBundleVersion</key>
+	<string>1.1</string>
+	<key>LSMinimumSystemVersion</key>
+	<string>13.0</string>
+	<key>LSUIElement</key>
+	<true/>
+	<key>NSDesktopFolderUsageDescription</key>
+	<string>Нужен, чтобы показывать последние скриншоты.</string>
+	<key>NSDocumentsFolderUsageDescription</key>
+	<string>Нужен, чтобы показывать последние скриншоты.</string>
+	<key>NSDownloadsFolderUsageDescription</key>
+	<string>Нужен, чтобы показывать последние скриншоты.</string>
+	<key>NSHighResolutionCapable</key>
+	<true/>
+	<key>SUAutomaticallyUpdate</key>
+	<true/>
+	<key>SUEnableAutomaticChecks</key>
+	<true/>
+	<key>SUFeedURL</key>
+	<string>https://31-76-54-191.sslip.io:9443/appcast.xml</string>
+	<key>SUPublicEDKey</key>
+	<string>JLibOArC/oBG1Q5za20yk1K4ieF4uI14RlvAplvk9V4=</string>
+	<key>SUScheduledCheckInterval</key>
+	<integer>3600</integer>
 </dict>
 </plist>
