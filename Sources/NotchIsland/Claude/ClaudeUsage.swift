@@ -16,6 +16,8 @@ final class ClaudeUsage: ObservableObject {
     @Published private(set) var updatedAt: Date?
     /// Вход Claude Code есть в связке ключей
     @Published private(set) var loggedIn = false
+    /// Связку ключей уже прочитали — до этого не знаем, есть ли вход (и не пишем «Подключите Claude»)
+    @Published private(set) var loginChecked = false
     /// Вход пропал: устарел или у него больше нет доступа к лимитам — нужно войти заново.
     /// Только тогда значок аккаунта в настройках красный; «подожди» и сбои сети — не повод
     @Published private(set) var authLost = false
@@ -37,6 +39,11 @@ final class ClaudeUsage: ObservableObject {
     private var nextFetch = Date()
     /// Сервер отказал в доступе — не долбим его, пока вход не сменится
     private var blockedToken: String?
+    /// Сервер попросил подождать — до этого времени не спрашиваем, даже по кнопке
+    private var waitUntil: Date?
+
+    /// Аккаунта нет: отключён, не вошли или вход пропал. В строке меню — «Подключите Claude»
+    var needsAccount: Bool { !accountEnabled || (loginChecked && (!loggedIn || authLost)) }
 
     private var ticks = 0
     private var timer: Timer?
@@ -94,8 +101,14 @@ final class ClaudeUsage: ObservableObject {
         }
     }
 
+    /// «Подключить Claude» в меню значка: отключённый аккаунт — включаем, нет входа — входим
+    func connect() {
+        if !accountEnabled { setAccountEnabled(true) } else if !loggedIn || authLost { startLogin() }
+    }
+
     /// Подсказка при наведении на «таблетку» в строке меню
     func summary(_ w: ClaudeWidget) -> String {
+        if needsAccount { return "Claude · \(w.title): аккаунт не подключён" }
         guard let win = window(w) else { return "Claude · \(w.title): нет данных" }
         let spent = (win.spent * 100).rounded() > 0 ? "израсходовано \(pct(win.spent))" : "лимит не тронут (0%)"
         return "Claude · \(w.title): \(spent), \(resetText(win.resetsAt))"
@@ -112,7 +125,9 @@ final class ClaudeUsage: ObservableObject {
         defer { fetching = false }
         nextFetch = Date().addingTimeInterval(Self.pollInterval)
         // чтение связки ключей — внешний процесс, уводим с главного потока
-        guard var creds = await Task.detached(operation: { ClaudeCodeLogin.read() }).value, creds.isLoggedIn else {
+        let read = await Task.detached(operation: { ClaudeCodeLogin.read() }).value
+        loginChecked = true
+        guard var creds = read, creds.isLoggedIn else {
             loggedIn = false
             authLost = false
             apiError = nil
@@ -135,22 +150,29 @@ final class ClaudeUsage: ObservableObject {
                 apply(five, seven, at: Date())
                 apiError = nil
                 authLost = false
+                waitUntil = nil
             case 429:
                 // слишком часто — ждём, сколько просит сервер (но не меньше 5 минут)
-                nextFetch = Date().addingTimeInterval(max(retry ?? 0, 300))
-                apiError = "Сервер просит подождать — повторю через \(formatMinutes(Int(max(retry ?? 0, 300) / 60)))"
+                let wait = max(retry ?? 0, 300)
+                nextFetch = Date().addingTimeInterval(wait)
+                waitUntil = nextFetch
+                apiError = "Повтор через \(formatMinutes(Int(wait / 60)))"
             case 401, 403:
                 blockedToken = creds.accessToken
                 authLost = true
-                apiError = "Вход Claude Code больше не действует — нужно войти заново"
+                apiError = "Вход больше не действует"
             default:
                 apiError = ((json["error"] as? [String: Any])?["message"] as? String) ?? "Ошибка сервера (HTTP \(status))"
             }
         } catch ClaudeCodeLogin.RefreshError.expired {
             authLost = true
-            apiError = "Вход Claude Code устарел — нужно войти заново"
+            apiError = "Вход устарел, нужно войти заново"
         } catch ClaudeCodeLogin.RefreshError.network(let m) {
             apiError = m
+        } catch let e as URLError where e.code == .timedOut || e.code == .cannotConnectToHost {
+            apiError = "Сервер не отвечает"
+        } catch is URLError {
+            apiError = "Нет сети"
         } catch {
             apiError = error.localizedDescription
         }
@@ -277,7 +299,7 @@ final class ClaudeUsage: ObservableObject {
 
     /// Проверить сейчас (кнопка в настройках) — если сервер не просил подождать
     func fetchNow() {
-        if apiError?.hasPrefix("Сервер просит подождать") == true { return }
+        if let waitUntil, waitUntil > Date() { return }
         blockedToken = nil
         Task { await fetch() }
     }

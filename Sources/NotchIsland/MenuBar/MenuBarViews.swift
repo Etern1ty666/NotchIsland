@@ -127,23 +127,24 @@ struct MenuBarClaude: View {
     var body: some View {
         let w = usage.window(widget)
         HStack(spacing: 5) {
-            GaugeView(gauge: .bar(w?.spent ?? 0), color: claudeColor(w))
-                .frame(width: 24, height: 5)
-            VStack(alignment: .leading, spacing: -1) {
-                Text(widget.menuBarLabel)
-                Text(resetShort(w))
-            }
-            .font(.system(size: 9, weight: .semibold, design: .rounded).monospacedDigit())
-            .foregroundStyle(Color.white.opacity(0.55))
-            Image(systemName: "sparkles")
-                .font(.system(size: 11, weight: .semibold))
-                .foregroundStyle(Color.white.opacity(0.75))
-            if let w {
-                percentText(w.spent, size: 12, warn: false, color: claudeNumberColor(w))
+            if usage.needsAccount {
+                // аккаунта нет — только приглашение подключить
+                Text("Подключите Claude")
+                    .font(.system(size: 11, weight: .semibold, design: .rounded))
+                    .foregroundStyle(Color.white.opacity(0.75))
+                sparkles
             } else {
-                Text("—")
-                    .font(.system(size: 12, weight: .semibold, design: .rounded))
-                    .foregroundStyle(Color.white.opacity(0.5))
+                GaugeView(gauge: .bar(w?.spent ?? 0), color: claudeColor(w))
+                    .frame(width: 24, height: 5)
+                // нет данных — только тип окна, без «нет данных» и прочерков
+                VStack(alignment: .leading, spacing: -1) {
+                    Text(widget.menuBarLabel)
+                    if let w { Text(resetShort(w)) }
+                }
+                .font(.system(size: 9, weight: .semibold, design: .rounded).monospacedDigit())
+                .foregroundStyle(Color.white.opacity(0.55))
+                sparkles
+                if let w { percentText(w.spent, size: 12, warn: false, color: claudeNumberColor(w)) }
             }
         }
         .padding(.horizontal, 8)
@@ -153,9 +154,14 @@ struct MenuBarClaude: View {
         .animation(.easeOut(duration: 0.3), value: claudeColor(w))
     }
 
+    var sparkles: some View {
+        Image(systemName: "sparkles")
+            .font(.system(size: 11, weight: .semibold))
+            .foregroundStyle(Color.white.opacity(0.75))
+    }
+
     /// Сколько до сброса: «2ч 10м», «3д 4ч»
-    func resetShort(_ w: UsageWindow?) -> String {
-        guard let w else { return "нет данных" }
+    func resetShort(_ w: UsageWindow) -> String {
         guard let reset = w.resetsAt else { return "не начато" }
         if w.isReset { return "сейчас" }
         return shortDuration(minutes: Int((reset.timeIntervalSinceNow / 60).rounded(.up)))

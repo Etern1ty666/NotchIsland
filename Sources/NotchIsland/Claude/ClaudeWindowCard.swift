@@ -30,7 +30,7 @@ struct ClaudeWindowCard: View {
             if let window {
                 Text("\(percentText(window.spent, size: 20, warn: false, color: claudeNumberColor(window)))\(Text(" израсходовано").font(.system(size: 11, weight: .medium)).foregroundColor(.white.opacity(0.45)))")
             } else {
-                valueText("—", " нет данных")
+                valueText("—")
             }
         }
     }

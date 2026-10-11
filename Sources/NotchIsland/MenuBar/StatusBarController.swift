@@ -22,6 +22,8 @@ final class StatusBarController: NSObject, NSMenuDelegate {
     var appItem: NSStatusItem?
     /// Какие значки сейчас показаны, справа налево
     private var shown: [String] = []
+    /// Вид «таблетки» Claude («подключите», «без данных», «с цифрами») — при смене ширина задаётся заново
+    private var claudeLooks: [ClaudeWidget: String] = [:]
     var bag = Set<AnyCancellable>()
     /// Чьё это меню — по нему menuNeedsUpdate решает, что показать
     var menuKinds: [ObjectIdentifier: MenuKind] = [:]
@@ -140,6 +142,7 @@ final class StatusBarController: NSObject, NSMenuDelegate {
         awakeItem = nil
         appItem = nil
         menuKinds = [:]
+        claudeLooks = [:]
         for name in wanted {
             if name == "awake.right" {
                 awakeItem = makeItem(name, kind: .awake, content: MenuBarAwake(awake: awake))
@@ -161,10 +164,18 @@ final class StatusBarController: NSObject, NSMenuDelegate {
         shown = wanted
     }
 
+    /// Ширина значков Claude: в пределах одного вида только растёт (цифры не дёргают соседей),
+    /// а при смене вида — по новому содержимому
     func claudeDidUpdate() {
-        for (w, item) in claudeItems where item.isVisible {
+        for (w, item) in claudeItems {
+            let look = usage.needsAccount ? "account" : (usage.window(w) == nil ? "empty" : "data")
             let width = ceil(measure(w) + 2)
-            if width > item.length { item.length = width }
+            if claudeLooks[w] != look {
+                claudeLooks[w] = look
+                item.length = look == "data" ? width + 7 : width   // запас под двузначные проценты
+            } else if width > item.length {
+                item.length = width
+            }
             item.button?.toolTip = usage.summary(w)
         }
     }

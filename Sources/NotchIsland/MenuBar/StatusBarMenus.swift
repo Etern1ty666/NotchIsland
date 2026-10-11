@@ -29,6 +29,9 @@ extension StatusBarController {
             let hide = addItem(to: menu, "Спрятать", #selector(toggleStat(_:)))
             hide.representedObject = s.rawValue
         case .claude(let w):
+            if usage.needsAccount {
+                _ = addItem(to: menu, "Подключить Claude", #selector(connectClaude))
+            }
             _ = addItem(to: menu, "Открыть лимиты на claude.ai", #selector(openClaudeUsage))
             let hide = addItem(to: menu, "Спрятать", #selector(toggleClaude(_:)))
             hide.representedObject = w.rawValue
@@ -61,6 +64,12 @@ extension StatusBarController {
     @objc func showSettings() { openSettings?() }
 
     @objc func hideAppIcon() { statsSettings.showAppIcon = false }
+
+    /// Включаем аккаунт или запускаем вход и показываем, как идёт подключение, — в настройках острова
+    @objc func connectClaude() {
+        usage.connect()
+        openSettings?()
+    }
 
     @objc func openActivityMonitor(_ sender: NSMenuItem) {
         guard let raw = sender.representedObject as? String, let s = Stat(rawValue: raw) else { return }
