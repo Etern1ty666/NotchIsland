@@ -60,7 +60,6 @@ struct ClipboardTab: View {
                 .lineLimit(2)
             Spacer(minLength: 0)
             PillButton(title: "Разрешить") { clip.requestScreenshotAccess() }
-            PillButton(title: "Настройки") { ClipboardStore.openFilesAndFoldersSettings() }
         }
         .padding(.horizontal, 10)
         .padding(.vertical, 8)

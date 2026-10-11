@@ -82,7 +82,7 @@ struct CardLayout<Value: View>: View {
 
     private var pinHint: String? {
         guard onTap == nil, let pinned else { return nil }
-        return pinned ? "Нажми, чтобы убрать из строки меню" : "Нажми, чтобы показывать в строке меню"
+        return pinned ? "Нажатие — убрать из строки меню" : "Нажатие — показывать в строке меню"
     }
 
     private var helpText: String {

@@ -124,7 +124,7 @@ struct SettingsView: View {
         if !usage.accountEnabled { return "Отключено — лимиты не запрашиваются" }
         if !usage.loggedIn || usage.authLost {
             switch usage.login {
-            case .idle: return usage.authLost ? (usage.apiError ?? "Вход пропал — войди заново") : "Вход не выполнен"
+            case .idle: return usage.authLost ? (usage.apiError ?? "Вход пропал — нужно войти заново") : "Вход не выполнен"
             case .waiting: return "Жду вход в браузере"
             case .failed(let m): return m
             }
@@ -194,7 +194,7 @@ struct MenuBarToggle: View {
         }
         .buttonStyle(.plain)
         .onHover { hover = $0 }
-        .help(isOn ? "Показывается в строке меню — нажми, чтобы спрятать" : "Нажми, чтобы показывать в строке меню")
+        .help(isOn ? "Показывается в строке меню. Нажатие — спрятать" : "Нажатие — показывать в строке меню")
         .accessibilityAddTraits(isOn ? .isSelected : [])
     }
 }

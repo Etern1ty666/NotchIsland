@@ -39,7 +39,7 @@ struct ClaudeWindowCard: View {
         guard let window else {
             if !usage.accountEnabled { return "Аккаунт отключён — см. настройки" }
             if let e = usage.apiError { return e }
-            return usage.loggedIn ? "Загружаю" : "Войди в Claude Code — см. настройки"
+            return usage.loggedIn ? "Загружаю" : "Нужен вход в Claude Code — см. настройки"
         }
         return resetText(window.resetsAt).capitalizedFirst
     }

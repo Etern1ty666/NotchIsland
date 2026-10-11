@@ -118,8 +118,8 @@ struct BatteryGlyph: View {
     }
 }
 
-/// Лимит подписки Claude в строке меню: шкала расхода, значок, проценты и подпись в две строки:
-/// какое окно («5 ч» или «Нед») и сколько до сброса
+/// Лимит подписки Claude в строке меню: слева в две строки — какое окно («5 ч» или «Нед») и сколько
+/// до сброса, дальше шкала расхода, значок и проценты
 struct MenuBarClaude: View {
     let widget: ClaudeWidget
     @ObservedObject var usage: ClaudeUsage
@@ -127,6 +127,12 @@ struct MenuBarClaude: View {
     var body: some View {
         let w = usage.window(widget)
         HStack(spacing: 5) {
+            VStack(alignment: .leading, spacing: -1) {
+                Text(widget.menuBarLabel)
+                Text(resetShort(w))
+            }
+            .font(.system(size: 9, weight: .semibold, design: .rounded).monospacedDigit())
+            .foregroundStyle(Color.white.opacity(0.55))
             GaugeView(gauge: .bar(w?.spent ?? 0), color: claudeColor(w))
                 .frame(width: 24, height: 5)
             Image(systemName: "sparkles")
@@ -139,12 +145,6 @@ struct MenuBarClaude: View {
                     .font(.system(size: 12, weight: .semibold, design: .rounded))
                     .foregroundStyle(Color.white.opacity(0.5))
             }
-            VStack(alignment: .leading, spacing: -1) {
-                Text(widget.menuBarLabel)
-                Text("↻ " + resetShort(w))
-            }
-            .font(.system(size: 9, weight: .semibold, design: .rounded).monospacedDigit())
-            .foregroundStyle(Color.white.opacity(0.55))
         }
         .padding(.horizontal, 8)
         .frame(height: 22)

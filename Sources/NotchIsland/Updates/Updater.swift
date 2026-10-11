@@ -44,7 +44,7 @@ final class Updater: NSObject, ObservableObject, SPUUpdaterDelegate, SPUUserDriv
     private var expectedLength: UInt64 = 0
     private var receivedLength: UInt64 = 0
 
-    static var currentVersion: String {
+    nonisolated static var currentVersion: String {
         Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? "?"
     }
 

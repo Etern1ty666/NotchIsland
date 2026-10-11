@@ -9,8 +9,6 @@ enum AppPaths {
 
 /// Ключи настроек в UserDefaults — в одном месте, чтобы не разъехались
 enum DefaultsKey {
-    /// Последняя открытая вкладка острова
-    static let lastTab = "lastTab"
     /// Статистики и окна лимитов Claude, закреплённые в строке меню
     static let menuStats = "menuStats"
     static let menuClaude = "menuClaude"
@@ -18,8 +16,9 @@ enum DefaultsKey {
     static let claudeAccount = "claudeAccountEnabled"
     /// Буфер: срок хранения истории
     static let clipRetention = "clipRetention"
-    /// Остров уже раскрывали — зелёная подсказка вокруг выреза больше не нужна
-    static let islandHintShown = "islandHintShown"
+    /// Версия, в которой остров уже раскрывали: после установки и каждого обновления
+    /// вокруг выреза снова зелёная подсказка
+    static let islandHintVersion = "islandHintVersion"
     /// Автозапуск уже включали один раз после установки
     static let autostartInitialized = "autostartInitialized"
 }

@@ -4,17 +4,15 @@ final class IslandState: ObservableObject {
     @Published var expanded = false
     /// Курсор лежит на вырезе и остров вот-вот раскроется — он немного «подрастает»
     @Published var peeking = false
-    /// Последняя открытая вкладка запоминается между запусками
-    @Published var tab: Tab = Tab(rawValue: UserDefaults.standard.string(forKey: DefaultsKey.lastTab) ?? "") ?? .clipboard {
-        didSet { UserDefaults.standard.set(tab.rawValue, forKey: DefaultsKey.lastTab) }
-    }
+    /// Остров всегда открывается на буфере
+    @Published var tab: Tab = .clipboard
     /// Размер выреза (или его имитации на экране без выреза)
     @Published var notch = CGSize(width: 180, height: 32)
     /// Открыта страница настроек (шестерёнка справа от zzz) — вместо вкладки
     @Published var showSettings = false
-    /// Первый запуск: вокруг выреза пульсирует зелёное свечение — «наведи сюда курсор».
-    /// Гаснет, когда остров раскроют впервые
-    @Published var showHint = !UserDefaults.standard.bool(forKey: DefaultsKey.islandHintShown)
+    /// После установки и каждого обновления вокруг выреза пульсирует зелёное свечение — «курсор сюда».
+    /// Гаснет, когда остров раскроют
+    @Published var showHint = UserDefaults.standard.string(forKey: DefaultsKey.islandHintVersion) != Updater.currentVersion
     /// Есть обновление или оно ставится — внизу острова полоса с кнопкой и прогрессом
     @Published var updateBar = false
     /// Показать меню «не засыпать» под кнопкой (её рамка в координатах острова)

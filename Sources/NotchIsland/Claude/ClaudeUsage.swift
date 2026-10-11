@@ -142,13 +142,13 @@ final class ClaudeUsage: ObservableObject {
             case 401, 403:
                 blockedToken = creds.accessToken
                 authLost = true
-                apiError = "Вход Claude Code больше не действует — войди заново"
+                apiError = "Вход Claude Code больше не действует — нужно войти заново"
             default:
                 apiError = ((json["error"] as? [String: Any])?["message"] as? String) ?? "Ошибка сервера (HTTP \(status))"
             }
         } catch ClaudeCodeLogin.RefreshError.expired {
             authLost = true
-            apiError = "Вход Claude Code устарел — войди заново"
+            apiError = "Вход Claude Code устарел — нужно войти заново"
         } catch ClaudeCodeLogin.RefreshError.network(let m) {
             apiError = m
         } catch {
@@ -228,7 +228,7 @@ final class ClaudeUsage: ObservableObject {
             finishLogin()
             fetchNow()
         } else {
-            login = .failed("Вход не завершён — попробуй ещё раз или открой в Терминале")
+            login = .failed("Вход не завершён — можно повторить или войти через Терминал")
         }
     }
 

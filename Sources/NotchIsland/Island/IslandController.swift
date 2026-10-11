@@ -205,14 +205,15 @@ final class IslandController: NSObject {
         collapseWork?.cancel()
         collapseWork = nil
         guard !state.expanded else { return }
-        // Свежий скриншот (последние 15 секунд) — сразу показываем буфер, он там первый
-        if clip.scanScreenshots() { state.tab = .clipboard }
+        // остров всегда открывается на буфере; заодно подхватываем свежие скриншоты
+        state.tab = .clipboard
+        clip.scanScreenshots()
         panel.ignoresMouseEvents = false
         hitPanel.ignoresMouseEvents = true
         state.expanded = true
         if state.showHint {
             state.showHint = false
-            UserDefaults.standard.set(true, forKey: DefaultsKey.islandHintShown)
+            UserDefaults.standard.set(Updater.currentVersion, forKey: DefaultsKey.islandHintVersion)
         }
     }
 

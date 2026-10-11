@@ -177,13 +177,16 @@ final class ClipboardStore: ObservableObject {
 
     /// Кнопка «Разрешить». После отказа macOS сама больше не спрашивает: сбрасываем отказ только
     /// для нашего приложения — и при следующем чтении папки macOS показывает своё окно снова.
-    /// Если сбросить не вышло — открываем «Конфиденциальность → Файлы и папки»
+    /// Окно держит чтение, пока на него не ответят, поэтому мгновенный повторный отказ значит:
+    /// окна не было. Тогда, как и при неудачном сбросе, открываем «Конфиденциальность → Файлы и папки»
     func requestScreenshotAccess() {
         guard let service = Self.privacyService(for: Self.screenshotDir()),
               let id = Bundle.main.bundleIdentifier, Self.resetPrivacy(service, for: id) else {
             return Self.openFilesAndFoldersSettings()
         }
+        let start = Date()
         scanScreenshots()
+        if screenshotsDenied && Date().timeIntervalSince(start) < 0.5 { Self.openFilesAndFoldersSettings() }
     }
 
     /// Защищённые папки и их разрешения в macOS; остальные папки читаются без спроса
