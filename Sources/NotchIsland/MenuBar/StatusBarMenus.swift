@@ -1,6 +1,6 @@
 import AppKit
 
-/// Меню значков в строке меню — у каждого своё, только кнопки:
+/// Меню значков в строке меню — у каждого своё: сверху подробные цифры, дальше кнопки:
 /// открыть свой раздел («Мониторинг системы» на нужной вкладке, настройки аккумулятора, лимиты
 /// на claude.ai), «Спрятать», «Настройки» и «Выйти из NotchIsland». У zzz — сроки режима
 extension StatusBarController {
@@ -19,8 +19,11 @@ extension StatusBarController {
             // значок приложения виден, только когда других нет; вернуть — в настройках, «Строка меню»
             _ = addItem(to: menu, "Спрятать", #selector(hideAppIcon))
         case .awake:
+            addHeader(to: menu, [(KeepAwake.title, [awake.remainingText])])
             awake.fill(menu, header: false)
         case .stat(let s):
+            // заголовок: главная цифра жирно, под ней подробности
+            addHeader(to: menu, [stats.menuHeader(s)])
             if s == .battery {
                 _ = addItem(to: menu, "Открыть настройки аккумулятора", #selector(openBatterySettings))
             } else {
@@ -30,6 +33,8 @@ extension StatusBarController {
             let hide = addItem(to: menu, "Спрятать", #selector(toggleStat(_:)))
             hide.representedObject = s.rawValue
         case .claude(let w):
+            // заголовок: оба окна — сколько израсходовано и через сколько сброс
+            if !usage.needsAccount { addHeader(to: menu, ClaudeWidget.allCases.map(claudeHeader)) }
             if usage.needsAccount {
                 _ = addItem(to: menu, "Подключить Claude", #selector(connectClaude))
             } else if usage.window(w) == nil {
@@ -43,6 +48,34 @@ extension StatusBarController {
         _ = addItem(to: menu, "Настройки", #selector(showSettings))
         menu.addItem(NSMenuItem(title: L("Выйти из NotchIsland"), action: #selector(NSApplication.terminate(_:)),
                                 keyEquivalent: ""))
+    }
+
+    /// Окно лимита Claude для заголовка: «Сессия · 5 ч — израсходовано 42%» и «Сброс через 2 ч 10 мин»
+    private func claudeHeader(_ w: ClaudeWidget) -> (String, [String]) {
+        guard let win = usage.window(w) else {
+            return (w.title, [usage.apiError ?? L("Загружаю")])
+        }
+        let spent = (win.spent * 100).rounded() > 0 ? L("израсходовано %@", pct(win.spent)) : L("лимит не тронут (0%)")
+        return (w.title + " — " + spent, [resetText(win.resetsAt).capitalizedFirst])
+    }
+
+    /// Текст над кнопками, блоками: заголовок жирно, под ним строки потише; не нажимается
+    private func addHeader(to menu: NSMenu, _ groups: [(String, [String])]) {
+        for (title, lines) in groups {
+            addText(to: menu, title, bold: true)
+            lines.forEach { addText(to: menu, $0, bold: false) }
+        }
+        menu.addItem(.separator())
+    }
+
+    private func addText(to menu: NSMenu, _ text: String, bold: Bool) {
+        let item = NSMenuItem(title: text, action: nil, keyEquivalent: "")
+        item.isEnabled = false
+        item.attributedTitle = NSAttributedString(string: text, attributes: [
+            .font: bold ? NSFont.menuFont(ofSize: 0).bold : NSFont.menuFont(ofSize: NSFont.smallSystemFontSize),
+            .foregroundColor: bold ? NSColor.labelColor : NSColor.secondaryLabelColor,
+        ])
+        menu.addItem(item)
     }
 
     private func addItem(to menu: NSMenu, _ title: String, _ action: Selector) -> NSMenuItem {
@@ -90,4 +123,8 @@ extension StatusBarController {
             NSWorkspace.shared.open(url)
         }
     }
+}
+
+private extension NSFont {
+    var bold: NSFont { NSFontManager.shared.convert(self, toHaveTrait: .boldFontMask) }
 }

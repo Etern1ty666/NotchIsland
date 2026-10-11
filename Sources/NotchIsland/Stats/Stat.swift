@@ -50,6 +50,10 @@ final class StatsSettings: ObservableObject {
     var pinnedClaude: Set<ClaudeWidget> {
         Set(menuOrder.compactMap { if case .claude(let w) = $0 { return w } else { return nil } })
     }
+    /// Тёмная «таблетка» под значками; без неё цвет значков — под светлую или тёмную строку меню
+    @Published var menuPill = UserDefaults.standard.object(forKey: DefaultsKey.menuPill) as? Bool ?? false {
+        didSet { UserDefaults.standard.set(menuPill, forKey: DefaultsKey.menuPill) }
+    }
     /// Значок приложения, когда других наших значков нет; его меню — «Спрятать»
     @Published var showAppIcon = UserDefaults.standard.object(forKey: DefaultsKey.menuAppIcon) as? Bool ?? true {
         didSet { UserDefaults.standard.set(showAppIcon, forKey: DefaultsKey.menuAppIcon) }
@@ -59,10 +63,13 @@ final class StatsSettings: ObservableObject {
         let d = UserDefaults.standard
         if let saved = d.stringArray(forKey: DefaultsKey.menuOrder) {
             menuOrder = saved.compactMap(MenuItem.init(key:))
+        } else if d.stringArray(forKey: DefaultsKey.menuStats) == nil && d.stringArray(forKey: DefaultsKey.menuClaude) == nil {
+            // первый запуск: справа батарея, левее диск и сеть. Все пять значков на строке меню
+            // MacBook рядом с чужими не помещаются, и macOS прячет лишние. Остальное включается булавкой
+            menuOrder = [.stat(.battery), .stat(.disk), .stat(.network)]
         } else {
             // до порядка были два набора и значки шли в постоянном порядке: справа лимиты Claude,
-            // левее статистики. По умолчанию — процессор и диск: все пять значков на строке меню
-            // MacBook рядом с чужими не помещаются, и macOS прячет лишние. Остальное включается булавкой
+            // левее статистики
             let stats = d.stringArray(forKey: DefaultsKey.menuStats).map { $0.compactMap(Stat.init(rawValue:)) } ?? [.cpu, .disk]
             let claude = (d.stringArray(forKey: DefaultsKey.menuClaude) ?? []).compactMap(ClaudeWidget.init(rawValue:))
             menuOrder = ClaudeWidget.allCases.reversed().filter(claude.contains).map(MenuItem.claude)
@@ -77,11 +84,4 @@ final class StatsSettings: ObservableObject {
     func toggle(_ item: MenuItem) {
         if let i = menuOrder.firstIndex(of: item) { menuOrder.remove(at: i) } else { menuOrder.append(item) }
     }
-}
-
-struct BatteryInfo: Equatable {
-    var level: Double        // 0...1
-    var charging: Bool
-    var onAC: Bool
-    var minutesLeft: Int?    // до полной зарядки или до разряда
 }

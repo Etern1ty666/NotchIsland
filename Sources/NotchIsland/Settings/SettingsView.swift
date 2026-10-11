@@ -24,6 +24,10 @@ struct SettingsView: View {
 
                 section("Строка меню", icon: "menubar.rectangle")
                 menuBarItems
+                SettingsRow(icon: "capsule", title: "Подложка",
+                            help: "Тёмная подложка под значками. Без неё значки подстраиваются под цвет строки меню") {
+                    SegmentPicker(options: [(false, "Выкл"), (true, "Вкл")], selection: $statsSettings.menuPill)
+                }
 
                 section("Экран", icon: "display")
                 SettingsRow(icon: "zzz", iconColor: awake.active ? Theme.awake : Color.white.opacity(0.5),

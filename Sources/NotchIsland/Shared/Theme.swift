@@ -35,14 +35,14 @@ func loadColor(_ u: Double, calm: Double = 0.5, busy: Double = 0.8) -> Color {
 }
 
 /// «37%» — число крупно, знак процента мельче и тусклее; при высокой нагрузке число краснеет.
-/// `color` задаёт цвет числа явно
-func percentText(_ u: Double, size: CGFloat, warn: Bool = true, color: Color? = nil) -> Text {
+/// `color` задаёт цвет числа явно, `ink` — основной цвет (белый на острове, в строке меню — под неё)
+func percentText(_ u: Double, size: CGFloat, warn: Bool = true, color: Color? = nil, ink: Color = .white) -> Text {
     let number = Text("\(Int((u * 100).rounded()))")
         .font(.system(size: size, weight: .semibold, design: .rounded).monospacedDigit())
-        .foregroundColor(color ?? (warn && u >= 0.8 ? loadColor(u) : .white))
+        .foregroundColor(color ?? (warn && u >= 0.8 ? loadColor(u) : ink))
     let sign = Text("%")
         .font(.system(size: size * 0.75, weight: .semibold, design: .rounded))
-        .foregroundColor(.white.opacity(0.5))
+        .foregroundColor(ink.opacity(0.5))
     return Text("\(number)\(sign)")
 }
 

@@ -14,6 +14,12 @@ enum DefaultsKey {
     /// Прежние наборы без порядка — только чтобы перенести их в menuOrder
     static let menuStats = "menuStats"
     static let menuClaude = "menuClaude"
+    /// Тёмная подложка под значками в строке меню; без неё значки подстраиваются под строку
+    static let menuPill = "menuPill"
+    /// Обычный ток зарядки и разряда (мА) — чтобы сразу после подключения или отключения зарядки
+    /// показать примерное время, пока macOS его не посчитала
+    static let chargeCurrent = "batteryChargeCurrent"
+    static let drainCurrent = "batteryDrainCurrent"
     /// Значок приложения в строке меню (когда других наших нет)
     static let menuAppIcon = "menuAppIcon"
     /// Брать лимиты Claude через вход Claude Code (в настройках можно отключить)

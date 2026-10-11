@@ -1,13 +1,14 @@
 import SwiftUI
 
 /// Значок «сон»: zzz, перечёркнутый, когда Mac не даём засыпать.
-/// Своего «zzz.slash» в SF Symbols нет — черту рисуем сами; под ней полоска цвета фона,
-/// чтобы черта читалась поверх букв
+/// Своего «zzz.slash» в SF Symbols нет — черту рисуем сами; вдоль неё буквы прорезаны,
+/// чтобы черта читалась поверх них
 struct SleepIcon: View {
     let slashed: Bool
     var size: CGFloat = 12
-    /// Цвет подложки под значком — им «прорезаем» буквы вдоль черты
-    var background: Color
+    /// Цвет подложки под значком — им «прорезаем» буквы вдоль черты; nil — прорезь насквозь
+    /// (значок на прозрачной строке меню)
+    var background: Color?
 
     var body: some View {
         Image(systemName: "zzz")
@@ -15,12 +16,14 @@ struct SleepIcon: View {
             .overlay {
                 if slashed {
                     ZStack {
-                        Capsule().fill(background).frame(width: size * 0.24, height: size * 1.4)
+                        Capsule().fill(background ?? .black).frame(width: size * 0.24, height: size * 1.4)
+                            .blendMode(background == nil ? .destinationOut : .normal)
                         Capsule().frame(width: size * 0.1, height: size * 1.3)
                     }
                     .rotationEffect(.degrees(-45))
                 }
             }
+            .compositingGroup()
     }
 }
 

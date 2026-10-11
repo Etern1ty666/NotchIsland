@@ -21,14 +21,13 @@ func bytesParts(_ b: Double, binary: Bool = false) -> (number: String, unit: Str
 
 func formatSpeed(_ b: Double) -> String { formatBytes(b) + L("/с") }
 
-/// Коротко для строки меню: «45м», «2ч 10м», «3д 4ч»
+/// Коротко для строки меню: «45м», «2ч 10м», «4д»
 func shortDuration(minutes m: Int) -> String {
     let m = max(0, m)
     let min = L("м"), hour = L("ч"), day = L("д")
     if m < 60 { return "\(m)\(min)" }
     if m < 24 * 60 { return "\(m / 60)\(hour)" + (m % 60 > 0 ? " \(m % 60)\(min)" : "") }
-    let h = (m % (24 * 60)) / 60
-    return "\(m / (24 * 60))\(day)" + (h > 0 ? " \(h)\(hour)" : "")
+    return "\(days(m))\(day)"   // от суток — только дни
 }
 
 /// 25 мин, 1 ч 12 мин
@@ -57,17 +56,17 @@ func parseISODate(_ s: String) -> Date? {
     return f.date(from: trimmed)
 }
 
-/// «сброс через 2 ч 10 мин» / «сброс в пн 14:00»
+/// «сброс через 25 мин», «сброс через 2 ч 10 мин», «сброс через 3 дня» — от суток только дни
 func resetText(_ d: Date?) -> String {
     guard let d else { return L("окно ещё не началось") }
     let m = Int((d.timeIntervalSinceNow / 60).rounded(.up))
     if m <= 0 { return L("окно обновилось") }
     if m < 24 * 60 { return L("сброс через %@", formatMinutes(m)) }
-    let f = DateFormatter()
-    f.locale = Localizer.shared.locale
-    f.dateFormat = "EE HH:mm"
-    return L("сброс в %@", f.string(from: d).lowercased())
+    return L("сброс через %@", countText(days(m), ru: ("день", "дня", "дней"), en: ("day", "days")))
 }
+
+/// Сколько дней — до ближайшего целого: 3 д 20 ч — это скорее 4 дня
+private func days(_ minutes: Int) -> Int { max(1, Int((Double(minutes) / (24 * 60)).rounded())) }
 
 extension String {
     /// «сброс через 2 ч» → «Сброс через 2 ч»

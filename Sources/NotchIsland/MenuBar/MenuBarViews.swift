@@ -1,31 +1,48 @@
 import SwiftUI
 import AppKit
 
-/// Статистика в строке меню: шкала, значок и значение на тёмной «таблетке»; у батареи — своя
+/// Значки в строке меню — на тёмной «таблетке» (белые) или без неё: тогда цвет под строку меню —
+/// белый на тёмной, чёрный на светлой, чтобы на прозрачной строке поверх обоев не сливались
+extension View {
+    func menuBarPill(_ on: Bool, padding: CGFloat = 8, scheme: ColorScheme) -> some View {
+        self.padding(.horizontal, on ? padding : 3)
+            .frame(height: 22)
+            .background(Capsule().fill(on ? Theme.menuBarPill : .clear))
+            .environment(\.colorScheme, on ? .dark : scheme)
+    }
+}
+
+/// Основной цвет значка: на «таблетке» всегда белый, без неё — как текст строки меню
+func menuBarInk(pill: Bool, scheme: ColorScheme) -> Color {
+    pill || scheme == .dark ? .white : .black
+}
+
+/// Статистика в строке меню: шкала, значок и значение; у батареи — своя
 struct MenuBarStat: View {
     let stat: Stat
     @ObservedObject var stats: SystemStats
+    @ObservedObject var settings: StatsSettings
+    /// Оформление строки меню (светлая или тёмная) — macOS сама меняет его под обои
+    @Environment(\.colorScheme) private var scheme
+    var ink: Color { menuBarInk(pill: settings.menuPill, scheme: scheme) }
 
     var body: some View {
         Group {
             if stat == .battery { battery } else { gauged }
         }
-        .padding(.horizontal, 8)
-        .frame(height: 22)
-        .background(Capsule().fill(Theme.menuBarPill))
-        .environment(\.colorScheme, .dark)
+        .menuBarPill(settings.menuPill, scheme: scheme)
         .animation(.easeOut(duration: 0.3), value: stats.color(stat))
     }
 
     var gauged: some View {
         let g = stats.gauge(stat)
         return HStack(spacing: 5) {
-            GaugeView(gauge: g, color: stats.color(stat))
+            GaugeView(gauge: g, color: stats.color(stat), ink: ink)
                 .frame(width: 32, height: g.isBar ? 5 : 12)
             HStack(spacing: 2) {
                 Image(systemName: stats.icon(stat))
                     .font(.system(size: 12, weight: .semibold))
-                    .foregroundStyle(Color.white.opacity(0.75))
+                    .foregroundStyle(ink.opacity(0.75))
                 value
             }
         }
@@ -33,9 +50,9 @@ struct MenuBarStat: View {
 
     @ViewBuilder var value: some View {
         switch stat {
-        case .cpu: percentText(stats.cpu, size: 12)
-        case .memory: percentText(stats.memFraction, size: 12, warn: false)
-        case .disk: percentText(stats.diskUsedFraction, size: 12, warn: false)
+        case .cpu: percentText(stats.cpu, size: 12, ink: ink)
+        case .memory: percentText(stats.memFraction, size: 12, warn: false, ink: ink)
+        case .disk: percentText(stats.diskUsedFraction, size: 12, warn: false, ink: ink)
         case .battery: EmptyView()
         case .network:
             // две строчки мелко: отдача сверху, загрузка снизу. Колонки: стрелки, числа по правому
@@ -57,7 +74,7 @@ struct MenuBarStat: View {
                 }
             }
             .font(.system(size: 9, weight: .semibold, design: .rounded).monospacedDigit())
-            .foregroundStyle(Color.white)
+            .foregroundStyle(ink)
             .fixedSize()
         }
     }
@@ -70,50 +87,62 @@ struct MenuBarStat: View {
         }
     }
 
-    /// Батарейка, залитая по заряду, с процентами на ней (и молнией при зарядке); рядом — сколько осталось
+    /// Батарейка, залитая по заряду, с процентами на ней (и молнией при зарядке); рядом — сколько
+    /// осталось (сразу после переключения — примерно, потом точнее) или вилка — от сети, но не заряжается
     var battery: some View {
         let b = stats.battery
         return HStack(spacing: 5) {
-            BatteryGlyph(level: b?.level ?? 0, charging: b?.charging ?? false, color: stats.color(.battery))
+            BatteryGlyph(level: b?.level ?? 0, charging: b?.charging ?? false, color: stats.color(.battery), ink: ink)
                 .frame(width: 36, height: 16)
-            if let m = b?.minutesLeft, b?.charging == true || b?.onAC == false {
-                Text(shortDuration(minutes: m))
-                    .font(.system(size: 11, weight: .semibold, design: .rounded).monospacedDigit())
-                    .foregroundStyle(Color.white.opacity(0.85))
+            if let b {
+                if b.state == .charging || b.state == .battery {
+                    if let m = b.minutes {
+                        Text(shortDuration(minutes: m))
+                            .font(.system(size: 11, weight: .semibold, design: .rounded).monospacedDigit())
+                            .foregroundStyle(ink.opacity(0.85))
+                    }
+                } else {
+                    Image(systemName: "powerplug.fill")
+                        .font(.system(size: 10, weight: .semibold))
+                        .foregroundStyle(ink.opacity(0.75))
+                }
             }
         }
     }
 }
 
-/// Батарейка без рамки: светлый корпус, ярче — заряд (белый; зелёный при зарядке, жёлтый и красный
-/// при низком заряде), проценты прямо на ней — тёмные, одним цветом: читаются на любой части
+/// Батарейка без рамки: полупрозрачный корпус, ярче — заряд (цвета `ink`; зелёный при зарядке, жёлтый
+/// и красный при низком заряде), проценты прямо на ней — контрастные, одним цветом: читаются на любой части
 struct BatteryGlyph: View {
     let level: Double
     let charging: Bool
     /// Цвет заряда из статистики: им красим заливку при зарядке и низком заряде
     let color: Color
+    /// Основной цвет: белая батарейка на тёмной строке меню, чёрная — на светлой
+    var ink = Color.white
+    var light: Bool { ink == .white }
 
     var body: some View {
         let shape = RoundedRectangle(cornerRadius: 4, style: .continuous)
         HStack(spacing: 1.5) {
             GeometryReader { g in
                 ZStack(alignment: .leading) {
-                    shape.fill(Color.white.opacity(0.5))
+                    shape.fill(ink.opacity(0.5))
                     Rectangle().fill(fillColor)
                         .frame(width: g.size.width * CGFloat(min(max(level, 0), 1)))
-                    label.foregroundStyle(Color.black.opacity(0.85))
+                    label.foregroundStyle((light ? Color.black : Color.white).opacity(0.85))
                 }
                 .clipShape(shape)
             }
             RoundedRectangle(cornerRadius: 1, style: .continuous)
-                .fill(Color.white.opacity(0.5))
+                .fill(ink.opacity(0.5))
                 .frame(width: 2, height: 5)
         }
     }
 
     var fillColor: Color {
         if charging { return Theme.ok }
-        return level >= 0.2 ? Color.white : color
+        return level >= 0.2 ? ink : color
     }
 
     var label: some View {
@@ -131,6 +160,9 @@ struct BatteryGlyph: View {
 struct MenuBarClaude: View {
     let widget: ClaudeWidget
     @ObservedObject var usage: ClaudeUsage
+    @ObservedObject var settings: StatsSettings
+    @Environment(\.colorScheme) private var scheme
+    var ink: Color { menuBarInk(pill: settings.menuPill, scheme: scheme) }
 
     var body: some View {
         let w = usage.window(widget)
@@ -139,10 +171,10 @@ struct MenuBarClaude: View {
                 // аккаунта нет — только приглашение подключить
                 Text(L("Подключите Claude"))
                     .font(.system(size: 11, weight: .semibold, design: .rounded))
-                    .foregroundStyle(Color.white.opacity(0.75))
+                    .foregroundStyle(ink.opacity(0.75))
                 sparkles
             } else {
-                GaugeView(gauge: .bar(w?.spent ?? 0), color: claudeColor(w))
+                GaugeView(gauge: .bar(w?.spent ?? 0), color: claudeColor(w), ink: ink)
                     .frame(width: 24, height: 5)
                 // нет данных — только тип окна, без «нет данных» и прочерков
                 VStack(alignment: .leading, spacing: -1) {
@@ -150,22 +182,19 @@ struct MenuBarClaude: View {
                     if let w { Text(resetShort(w)) }
                 }
                 .font(.system(size: 9, weight: .semibold, design: .rounded).monospacedDigit())
-                .foregroundStyle(Color.white.opacity(0.55))
+                .foregroundStyle(ink.opacity(0.55))
                 sparkles
-                if let w { percentText(w.spent, size: 12, warn: false, color: claudeNumberColor(w)) }
+                if let w { percentText(w.spent, size: 12, warn: false, color: claudeNumberColor(w), ink: ink) }
             }
         }
-        .padding(.horizontal, 8)
-        .frame(height: 22)
-        .background(Capsule().fill(Theme.menuBarPill))
-        .environment(\.colorScheme, .dark)
+        .menuBarPill(settings.menuPill, scheme: scheme)
         .animation(.easeOut(duration: 0.3), value: claudeColor(w))
     }
 
     var sparkles: some View {
         Image(systemName: "sparkles")
             .font(.system(size: 11, weight: .semibold))
-            .foregroundStyle(Color.white.opacity(0.75))
+            .foregroundStyle(ink.opacity(0.75))
     }
 
     /// Сколько до сброса: «2ч 10м», «3д 4ч»
@@ -180,6 +209,8 @@ struct MenuBarClaude: View {
 /// оранжевый, а если выбран срок — с обратным отсчётом
 struct MenuBarAwake: View {
     @ObservedObject var awake: KeepAwake
+    @ObservedObject var settings: StatsSettings
+    @Environment(\.colorScheme) private var scheme
 
     var body: some View {
         // значок есть, только пока режим включён (StatusBarController)
@@ -188,7 +219,8 @@ struct MenuBarAwake: View {
 
     var pill: some View {
         HStack(spacing: 4) {
-            SleepIcon(slashed: true, size: 11, background: Theme.menuBarPill)
+            // без «таблетки» черта прорезает буквы насквозь — под ней видна строка меню
+            SleepIcon(slashed: true, size: 11, background: settings.menuPill ? Theme.menuBarPill : nil)
             // выбран срок — рядом обратный отсчёт; ширина под две цифры, чтобы соседи не прыгали
             if let until = awake.until {
                 TimelineView(.periodic(from: .now, by: 1)) { context in
@@ -201,10 +233,7 @@ struct MenuBarAwake: View {
             }
         }
         .foregroundStyle(Theme.awake)
-        .padding(.horizontal, 9)
-        .frame(height: 22)
-        .background(Capsule().fill(Theme.menuBarPill))
-        .environment(\.colorScheme, .dark)
+        .menuBarPill(settings.menuPill, padding: 9, scheme: scheme)
     }
 }
 

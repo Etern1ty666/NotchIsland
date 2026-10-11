@@ -11,6 +11,8 @@ enum Gauge {
 struct GaugeView: View {
     let gauge: Gauge
     let color: Color
+    /// Основной цвет: им подкрашена пустая часть полоски
+    var ink = Color.white
 
     var body: some View {
         switch gauge {
@@ -25,7 +27,7 @@ struct GaugeView: View {
             GeometryReader { g in
                 ZStack(alignment: .leading) {
                     // пустая шкала подкрашена своим цветом: «0» отличается от «нет данных» (серый)
-                    Capsule().fill(f > 0 ? Color.white.opacity(0.15) : color.opacity(0.35))
+                    Capsule().fill(f > 0 ? ink.opacity(0.15) : color.opacity(0.35))
                     if f > 0 {
                         Capsule().fill(color).frame(width: max(g.size.height, g.size.width * CGFloat(min(f, 1))))
                     }

@@ -1,7 +1,5 @@
 import SwiftUI
 import AppKit
-import IOKit
-import IOKit.ps
 
 final class SystemStats: ObservableObject {
     /// Сколько замеров храним для графиков (раз в 2 с -> последняя минута)
@@ -15,15 +13,26 @@ final class SystemStats: ObservableObject {
     let memTotal = Double(ProcessInfo.processInfo.physicalMemory)
     @Published private(set) var memUsed: Double = 0
     @Published private(set) var memHistory: [Double] = []
+    /// Из чего складывается занятая память и сколько под кэшем — для меню значка (не перерисовывают вид)
+    private(set) var memApp: Double = 0
+    private(set) var memWired: Double = 0
+    private(set) var memCompressed: Double = 0
+    private(set) var memCached: Double = 0
 
     @Published private(set) var netIn: Double = 0        // байт/с
     @Published private(set) var netOut: Double = 0
     @Published private(set) var netHistory: [Double] = []
+    /// Скорость за минуту по направлениям — пики для меню значка
+    private(set) var netInHistory: [Double] = []
+    private(set) var netOutHistory: [Double] = []
 
     @Published private(set) var diskFree: Double = 0
     @Published private(set) var diskTotal: Double = 0
 
+    /// Батарея — своим модулем (Battery.swift): события macOS, предел заряда, оценка времени
     @Published private(set) var battery: BatteryInfo?
+    private let batteryMonitor = BatteryMonitor()
+    var batteryDetails: BatteryDetails { batteryMonitor.details() }
 
     var memFraction: Double { memTotal > 0 ? memUsed / memTotal : 0 }
     var diskUsedFraction: Double { diskTotal > 0 ? 1 - diskFree / diskTotal : 0 }
@@ -47,7 +56,7 @@ final class SystemStats: ObservableObject {
         sampleNetwork()
         sampleMemory()
         sampleDisk()
-        battery = Self.readBattery(previous: nil)
+        batteryMonitor.$info.assign(to: &$battery)
         // первый замер чуть раньше, чтобы цифры появились сразу после запуска
         DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) { [weak self] in self?.sample() }
         let t = Timer(timeInterval: 2, repeats: true) { [weak self] _ in self?.sample() }
@@ -61,7 +70,6 @@ final class SystemStats: ObservableObject {
         sampleMemory()
         sampleNetwork()
         tick += 1
-        if tick % 5 == 0 { battery = Self.readBattery(previous: battery) }   // раз в 10 с
         if tick % 15 == 0 { sampleDisk() }                   // раз в 30 с
     }
 
@@ -113,7 +121,11 @@ final class SystemStats: ObservableObject {
         // как «Использовано» в «Мониторинге системы»: память приложений + неперемещаемая + сжатая
         let page = Double(vm_kernel_page_size)
         let app = max(0, Double(vm.internal_page_count) - Double(vm.purgeable_count))
-        memUsed = (app + Double(vm.wire_count) + Double(vm.compressor_page_count)) * page
+        memApp = app * page
+        memWired = Double(vm.wire_count) * page
+        memCompressed = Double(vm.compressor_page_count) * page
+        memCached = (Double(vm.external_page_count) + Double(vm.purgeable_count)) * page
+        memUsed = memApp + memWired + memCompressed
         Self.push(memFraction, to: &memHistory)
     }
 
@@ -147,62 +159,20 @@ final class SystemStats: ObservableObject {
             netIn = din / dt
             netOut = dout / dt
             Self.push(netIn + netOut, to: &netHistory)
+            Self.push(netIn, to: &netInHistory)
+            Self.push(netOut, to: &netOutHistory)
         }
         prevNet = now
         prevNetTime = t
     }
 
-    // MARK: Диск и батарея
+    // MARK: Диск
 
     private func sampleDisk() {
         let keys: Set<URLResourceKey> = [.volumeTotalCapacityKey, .volumeAvailableCapacityForImportantUsageKey]
         guard let v = try? URL(fileURLWithPath: "/").resourceValues(forKeys: keys) else { return }
         diskTotal = Double(v.volumeTotalCapacity ?? 0)
         diskFree = Double(v.volumeAvailableCapacityForImportantUsage ?? 0)
-    }
-
-    /// Сколько осталось, macOS иногда не знает («ещё считаю» — после пробуждения, отключения зарядки,
-    /// а то и посреди работы). Тогда держим прошлое значение, пока не сменилось питание, а если
-    /// его нет — спрашиваем контроллер батареи напрямую (оттуда же время берёт pmset)
-    static func readBattery(previous: BatteryInfo?) -> BatteryInfo? {
-        guard var b = readPowerSource() else { return nil }
-        if b.minutesLeft == nil {
-            if let previous, previous.charging == b.charging, previous.onAC == b.onAC {
-                b.minutesLeft = previous.minutesLeft
-            } else if b.charging || !b.onAC {
-                b.minutesLeft = smartBatteryMinutes(charging: b.charging)
-            }
-        }
-        return b
-    }
-
-    /// Среднее время до разряда (или до полной) у контроллера батареи; 65535 — «неизвестно»
-    private static func smartBatteryMinutes(charging: Bool) -> Int? {
-        let service = IOServiceGetMatchingService(kIOMainPortDefault, IOServiceMatching("AppleSmartBattery"))
-        guard service != 0 else { return nil }
-        defer { IOObjectRelease(service) }
-        let key = (charging ? "AvgTimeToFull" : "AvgTimeToEmpty") as CFString
-        guard let v = IORegistryEntryCreateCFProperty(service, key, kCFAllocatorDefault, 0)?
-                .takeRetainedValue() as? Int, v > 0, v < 65535 else { return nil }
-        return v
-    }
-
-    private static func readPowerSource() -> BatteryInfo? {
-        guard let info = IOPSCopyPowerSourcesInfo()?.takeRetainedValue(),
-              let list = IOPSCopyPowerSourcesList(info)?.takeRetainedValue() as? [CFTypeRef] else { return nil }
-        for src in list {
-            guard let d = IOPSGetPowerSourceDescription(info, src)?.takeUnretainedValue() as? [String: Any],
-                  d[kIOPSTypeKey] as? String == kIOPSInternalBatteryType else { continue }
-            let cur = Double(d[kIOPSCurrentCapacityKey] as? Int ?? 0)
-            let maxCap = Double(d[kIOPSMaxCapacityKey] as? Int ?? 100)
-            let charging = d[kIOPSIsChargingKey] as? Bool ?? false
-            let minutes = (charging ? d[kIOPSTimeToFullChargeKey] : d[kIOPSTimeToEmptyKey]) as? Int ?? -1
-            return BatteryInfo(level: maxCap > 0 ? min(1, cur / maxCap) : 0,
-                               charging: charging,
-                               onAC: d[kIOPSPowerSourceStateKey] as? String == kIOPSACPowerValue,
-                               minutesLeft: minutes > 0 ? minutes : nil)
-        }
-        return nil
     }
 
     // MARK: Для интерфейса
@@ -261,11 +231,6 @@ final class SystemStats: ObservableObject {
         }
     }
 
-    /// «Заряжается · до полной 40 мин», «От батареи · осталось 3 ч 10 мин»
-    var batteryState: String {
-        guard let b = battery else { return "" }
-        if b.charging { return L("Заряжается") + (b.minutesLeft.map { " · " + L("до полной %@", formatMinutes($0)) } ?? "") }
-        if b.onAC { return L("От сети") }
-        return L("От батареи") + (b.minutesLeft.map { " · " + L("осталось %@", formatMinutes($0)) } ?? "")
-    }
+    /// «Заряжается до 80% · 1 ч 10 мин», «От батареи · осталось 3 ч 10 мин»
+    var batteryState: String { battery?.statusText ?? "" }
 }

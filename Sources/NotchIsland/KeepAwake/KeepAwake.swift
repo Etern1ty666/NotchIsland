@@ -61,6 +61,14 @@ final class KeepAwake: NSObject, ObservableObject {
         return L("Экран не гаснет ещё %@", formatMinutes(m))
     }
 
+    /// «Ещё 25 мин · до 14:30», «Пока не выключите» — в меню значка zzz
+    var remainingText: String {
+        guard active else { return L("Выключено") }
+        guard let until else { return L("Пока не выключите") }
+        let m = max(1, Int((until.timeIntervalSinceNow / 60).rounded(.up)))
+        return L("Ещё %@ · до %@", formatMinutes(m), until.formatted(date: .omitted, time: .shortened))
+    }
+
     /// Сколько осталось — одной единицей для строки меню: «3ч», «25м», «40с».
     /// Округляем вверх: «25м» — осталось не больше 25 минут
     static func shortRemaining(until: Date, now: Date = Date()) -> String {

@@ -43,6 +43,15 @@ final class StatusBarController: NSObject, NSMenuDelegate {
             .receive(on: DispatchQueue.main)
             .sink { [weak self] _ in self?.updateStatusItems() }
             .store(in: &bag)
+        // с «таблеткой» и без неё у значков разная ширина — заново
+        statsSettings.$menuPill
+            .dropFirst()
+            .receive(on: DispatchQueue.main)
+            .sink { [weak self] _ in
+                self?.shown = []
+                self?.updateStatusItems()
+            }
+            .store(in: &bag)
         statsSettings.$showAppIcon
             .receive(on: DispatchQueue.main)
             .sink { [weak self] _ in self?.updateStatusItems() }
@@ -68,6 +77,12 @@ final class StatusBarController: NSObject, NSMenuDelegate {
             .store(in: &bag)
         // каждый замер: подсказки при наведении и ширина значков (только растёт — без дёрганья соседей)
         stats.$cpu
+            .receive(on: DispatchQueue.main)
+            .sink { [weak self] _ in self?.statsDidUpdate() }
+            .store(in: &bag)
+        // батарея меняется по событиям macOS — ширину и подсказку сразу, не ждём замера процессора
+        stats.$battery
+            .dropFirst()
             .receive(on: DispatchQueue.main)
             .sink { [weak self] _ in self?.statsDidUpdate() }
             .store(in: &bag)
@@ -108,11 +123,11 @@ final class StatusBarController: NSObject, NSMenuDelegate {
 
     /// Ширина «таблетки» с текущими значениями
     private func measure(_ s: Stat) -> CGFloat {
-        NSHostingView(rootView: MenuBarStat(stat: s, stats: stats)).fittingSize.width
+        NSHostingView(rootView: MenuBarStat(stat: s, stats: stats, settings: statsSettings)).fittingSize.width
     }
 
     private func measure(_ w: ClaudeWidget) -> CGFloat {
-        NSHostingView(rootView: MenuBarClaude(widget: w, usage: usage)).fittingSize.width
+        NSHostingView(rootView: MenuBarClaude(widget: w, usage: usage, settings: statsSettings)).fittingSize.width
     }
 
     func updateStatusItems() {
@@ -130,7 +145,7 @@ final class StatusBarController: NSObject, NSMenuDelegate {
 
         awakeItem?.button?.toolTip = awake.statusText
         if let awakeItem {
-            awakeItem.length = ceil(NSHostingView(rootView: MenuBarAwake(awake: awake)).fittingSize.width + 6)
+            awakeItem.length = ceil(NSHostingView(rootView: MenuBarAwake(awake: awake, settings: statsSettings)).fittingSize.width + 6)
         }
         statsDidUpdate()
         claudeDidUpdate()
@@ -151,18 +166,18 @@ final class StatusBarController: NSObject, NSMenuDelegate {
         for (i, name) in wanted.enumerated() {
             let slot = "item.\(i)"
             if name == "awake.right" {
-                awakeItem = makeItem(slot, kind: .awake, content: MenuBarAwake(awake: awake))
+                awakeItem = makeItem(slot, kind: .awake, content: MenuBarAwake(awake: awake, settings: statsSettings))
             } else if name == "app" {
                 let item = makeItem(slot, kind: .app)
                 item.button?.image = Self.makeMenuBarIcon()
                 item.button?.toolTip = "NotchIsland"
                 appItem = item
             } else if case .claude(let w) = MenuItem(key: name) {
-                let item = makeItem(slot, kind: .claude(w), content: MenuBarClaude(widget: w, usage: usage))
+                let item = makeItem(slot, kind: .claude(w), content: MenuBarClaude(widget: w, usage: usage, settings: statsSettings))
                 item.length = ceil(measure(w) + 9)   // запас под двузначные проценты
                 claudeItems[w] = item
             } else if case .stat(let s) = MenuItem(key: name) {
-                let item = makeItem(slot, kind: .stat(s), content: MenuBarStat(stat: s, stats: stats))
+                let item = makeItem(slot, kind: .stat(s), content: MenuBarStat(stat: s, stats: stats, settings: statsSettings))
                 item.length = ceil(measure(s) + reserve(s))
                 statItems[s] = item
             }
