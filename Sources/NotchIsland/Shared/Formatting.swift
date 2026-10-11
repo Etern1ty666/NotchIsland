@@ -4,15 +4,30 @@ func pct(_ v: Double) -> String { "\(Int((v * 100).rounded()))%" }
 
 /// 9,8 ГБ. Память считаем в двоичных единицах (как «Мониторинг системы»), диск и сеть — в десятичных (как Finder)
 func formatBytes(_ b: Double, binary: Bool = false) -> String {
+    let p = bytesParts(b, binary: binary)
+    return p.number + " " + p.unit
+}
+
+/// Число и единица отдельно — чтобы выровнять их колонками: («9,8», «ГБ»)
+func bytesParts(_ b: Double, binary: Bool = false) -> (number: String, unit: String) {
     let k: Double = binary ? 1024 : 1000
     let units = ["Б", "КБ", "МБ", "ГБ", "ТБ"]
     var v = max(0, b), i = 0
     while v >= k && i < units.count - 1 { v /= k; i += 1 }
     let s = i >= 2 && v < 100 ? String(format: "%.1f", v) : String(format: "%.0f", v)
-    return s.replacingOccurrences(of: ".", with: ",") + " " + units[i]
+    return (s.replacingOccurrences(of: ".", with: ","), units[i])
 }
 
 func formatSpeed(_ b: Double) -> String { formatBytes(b) + "/с" }
+
+/// Коротко для строки меню: «45м», «2ч 10м», «3д 4ч»
+func shortDuration(minutes m: Int) -> String {
+    let m = max(0, m)
+    if m < 60 { return "\(m)м" }
+    if m < 24 * 60 { return "\(m / 60)ч" + (m % 60 > 0 ? " \(m % 60)м" : "") }
+    let h = (m % (24 * 60)) / 60
+    return "\(m / (24 * 60))д" + (h > 0 ? " \(h)ч" : "")
+}
 
 /// 25 мин, 1 ч 12 мин
 func formatMinutes(_ m: Int) -> String {

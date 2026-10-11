@@ -10,7 +10,8 @@ struct SettingsView: View {
     let stats: SystemStats
     @ObservedObject var statsSettings: StatsSettings
     @ObservedObject var awake: KeepAwake
-    @ObservedObject var updater: Updater
+    /// Не @ObservedObject: за прогрессом следит UpdateStatus — страница не перерисовывается на каждый байт
+    let updater: Updater
     @ObservedObject var loginItem = LoginItem.shared
 
     var body: some View {
@@ -45,11 +46,7 @@ struct SettingsView: View {
                         .opacity(loginItem.available ? 1 : 0.5)
                 }
                 SettingsRow(icon: "arrow.down.circle", title: "Версия \(Updater.currentVersion)") {
-                    if updater.availableVersion != nil {
-                        PillButton(title: "Обновить") { updater.update() }
-                    } else {
-                        PillButton(title: "Проверить обновления") { updater.checkForUpdates() }
-                    }
+                    UpdateStatus(updater: updater)
                 }
             }
         }
@@ -62,20 +59,26 @@ struct SettingsView: View {
 
     // MARK: Строка меню
 
-    /// Какие значки показывать в строке меню — «таблетками», нажатие включает и выключает
+    /// Какие значки показывать в строке меню — плитками: ряд системы и ряд лимитов Claude,
+    /// каждая плитка во всю свою долю ширины; нажатие включает и выключает
     var menuBarItems: some View {
-        FlowLayout(spacing: 6) {
-            ForEach(stats.available) { s in
-                ChipToggle(title: s.title, isOn: statsSettings.pinned.contains(s)) { statsSettings.toggle(s) }
+        VStack(spacing: 6) {
+            HStack(spacing: 6) {
+                ForEach(stats.available) { s in
+                    MenuBarToggle(icon: stats.icon(s), title: s.title, isOn: statsSettings.pinned.contains(s)) {
+                        statsSettings.toggle(s)
+                    }
+                }
             }
-            ForEach(ClaudeWidget.allCases) { w in
-                ChipToggle(title: "Claude · " + w.title, isOn: statsSettings.pinnedClaude.contains(w)) {
-                    statsSettings.toggle(w)
+            HStack(spacing: 6) {
+                ForEach(ClaudeWidget.allCases) { w in
+                    MenuBarToggle(icon: "sparkles", title: "Claude · " + w.short, isOn: statsSettings.pinnedClaude.contains(w)) {
+                        statsSettings.toggle(w)
+                    }
                 }
             }
         }
-        .padding(10)
-        .frame(maxWidth: .infinity, alignment: .leading)
+        .padding(8)
         .cardBackground()
     }
 
@@ -122,12 +125,12 @@ struct SettingsView: View {
         if !usage.loggedIn || usage.authLost {
             switch usage.login {
             case .idle: return usage.authLost ? (usage.apiError ?? "Вход пропал — войди заново") : "Вход не выполнен"
-            case .waiting: return "Жду вход в браузере…"
+            case .waiting: return "Жду вход в браузере"
             case .failed(let m): return m
             }
         }
         if let e = usage.apiError { return e }
-        return usage.updatedAt.map { "Вход выполнен · обновлено " + agoText($0) } ?? "Проверяю…"
+        return usage.updatedAt.map { "Вход выполнен · обновлено " + agoText($0) } ?? "Проверяю"
     }
     /// Красный — только когда вход пропал; временные сбои сервера и сети значок не трогают
     var loginIcon: String {
@@ -166,8 +169,9 @@ struct SettingsRow<Accessory: View>: View {
     }
 }
 
-/// «Таблетка»-переключатель: включена — светлая с галочкой
-struct ChipToggle: View {
+/// Плитка «показывать в строке меню»: включена — светлая, выключена — тусклая
+struct MenuBarToggle: View {
+    let icon: String
     let title: String
     let isOn: Bool
     let action: () -> Void
@@ -175,17 +179,22 @@ struct ChipToggle: View {
 
     var body: some View {
         Button(action: action) {
-            HStack(spacing: 4) {
-                if isOn { Image(systemName: "checkmark").font(.system(size: 9, weight: .bold)) }
-                Text(title).font(.system(size: 11, weight: .semibold))
+            HStack(spacing: 6) {
+                Image(systemName: icon).font(.system(size: 11, weight: .semibold)).frame(width: 14)
+                Text(title).font(.system(size: 11, weight: .semibold)).lineLimit(1)
             }
-            .foregroundStyle(Color.white.opacity(isOn ? 1 : (hover ? 0.85 : 0.55)))
-            .padding(.horizontal, 10)
-            .frame(height: 24)
-            .background(Capsule().fill(Color.white.opacity(isOn ? 0.2 : (hover ? 0.1 : 0.06))))
-            .contentShape(Capsule())
+            .foregroundStyle(Color.white.opacity(isOn ? 1 : (hover ? 0.7 : 0.4)))
+            .frame(maxWidth: .infinity)
+            .frame(height: 32)
+            .background(RoundedRectangle(cornerRadius: 8, style: .continuous)
+                .fill(Color.white.opacity(isOn ? 0.16 : (hover ? 0.07 : 0.03))))
+            .overlay(RoundedRectangle(cornerRadius: 8, style: .continuous)
+                .strokeBorder(Color.white.opacity(isOn ? 0.18 : 0), lineWidth: 1))
+            .contentShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
         }
         .buttonStyle(.plain)
         .onHover { hover = $0 }
+        .help(isOn ? "Показывается в строке меню — нажми, чтобы спрятать" : "Нажми, чтобы показывать в строке меню")
+        .accessibilityAddTraits(isOn ? .isSelected : [])
     }
 }

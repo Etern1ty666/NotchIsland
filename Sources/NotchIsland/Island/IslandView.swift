@@ -66,8 +66,8 @@ struct IslandView: View {
             .padding(.top, 6)
             .padding(.bottom, 14)
             .frame(maxWidth: .infinity, maxHeight: .infinity)
-            if state.updateVersion != nil {
-                UpdateButton { state.installUpdate?() }
+            if state.updateBar {
+                UpdateBar(updater: updater)
                     .frame(height: Metrics.updateBarHeight, alignment: .top)
                     .transition(.opacity)
             }

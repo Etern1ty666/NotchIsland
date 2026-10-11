@@ -30,12 +30,14 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         statusBar.openSettings = { [weak controller] in controller?.showSettings() }
         self.statusBar = statusBar
 
-        // новая версия — зелёная кнопка внизу острова
+        // новая версия — полоса с кнопкой и прогрессом внизу острова
         let state = controller.state
-        state.installUpdate = { [weak updater] in updater?.update() }
-        updater.$availableVersion
+        updater.$phase
             .receive(on: DispatchQueue.main)
-            .sink { v in withAnimation(Metrics.spring) { state.updateVersion = v } }
+            .sink { [weak updater] _ in
+                let show = updater?.showsBar ?? false
+                if state.updateBar != show { withAnimation(Metrics.spring) { state.updateBar = show } }
+            }
             .store(in: &bag)
     }
 }

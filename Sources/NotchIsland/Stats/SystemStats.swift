@@ -241,10 +241,4 @@ final class SystemStats: ObservableObject {
         if b.onAC { return "От сети" }
         return "От батареи" + (b.minutesLeft.map { " · осталось \(formatMinutes($0))" } ?? "")
     }
-
-    static func openActivityMonitor() {
-        if let url = NSWorkspace.shared.urlForApplication(withBundleIdentifier: "com.apple.ActivityMonitor") {
-            NSWorkspace.shared.openApplication(at: url, configuration: NSWorkspace.OpenConfiguration())
-        }
-    }
 }

@@ -1,10 +1,8 @@
 import AppKit
 
-/// Меню значков в строке меню — у каждого своё:
-/// • статистика и лимит Claude — цифры подробнее, действие и «Убрать из строки меню»;
-/// • zzz — сроки «Держать экран включенным».
-/// Общее (какие значки показывать, автозапуск, обновления) — в настройках острова,
-/// внизу каждого меню — «Настройки…» и «Выйти»
+/// Меню значков в строке меню — у каждого своё, только кнопки:
+/// открыть свой раздел («Мониторинг системы» на нужной вкладке, настройки аккумулятора, лимиты
+/// на claude.ai), «Спрятать», «Настройки» и «Выйти из NotchIsland». У zzz — сроки режима
 extension StatusBarController {
     enum MenuKind {
         case app, awake
@@ -12,7 +10,7 @@ extension StatusBarController {
         case claude(ClaudeWidget)
     }
 
-    /// Содержимое собирается заново при каждом открытии — цифры всегда свежие
+    /// Содержимое собирается заново при каждом открытии
     func menuNeedsUpdate(_ menu: NSMenu) {
         menu.removeAllItems()
         switch menuKinds[ObjectIdentifier(menu)] ?? .app {
@@ -20,34 +18,25 @@ extension StatusBarController {
             // значок приложения виден, только когда других нет: остаётся дорога в настройки
             break
         case .awake:
-            awake.fill(menu, header: true)
+            awake.fill(menu, header: false)
         case .stat(let s):
-            addInfo(to: menu, stats.summary(s))
-            menu.addItem(.separator())
             if s == .battery {
-                _ = addItem(to: menu, "Настройки аккумулятора…", #selector(openBatterySettings))
+                _ = addItem(to: menu, "Открыть настройки аккумулятора", #selector(openBatterySettings))
             } else {
-                _ = addItem(to: menu, "Открыть «Мониторинг системы»", #selector(openActivityMonitor))
+                let open = addItem(to: menu, "Открыть «Мониторинг системы»", #selector(openActivityMonitor(_:)))
+                open.representedObject = s.rawValue
             }
-            let hide = addItem(to: menu, "Убрать из строки меню", #selector(toggleStat(_:)))
+            let hide = addItem(to: menu, "Спрятать", #selector(toggleStat(_:)))
             hide.representedObject = s.rawValue
         case .claude(let w):
-            addInfo(to: menu, usage.summary(w))
-            menu.addItem(.separator())
-            _ = addItem(to: menu, "Обновить лимиты", #selector(refreshClaude))
-            let hide = addItem(to: menu, "Убрать из строки меню", #selector(toggleClaude(_:)))
+            _ = addItem(to: menu, "Открыть лимиты на claude.ai", #selector(openClaudeUsage))
+            let hide = addItem(to: menu, "Спрятать", #selector(toggleClaude(_:)))
             hide.representedObject = w.rawValue
         }
         if !menu.items.isEmpty { menu.addItem(.separator()) }
-        _ = addItem(to: menu, "Настройки…", #selector(showSettings))
-        menu.addItem(withTitle: "Выйти из NotchIsland", action: #selector(NSApplication.terminate(_:)), keyEquivalent: "q")
-    }
-
-    /// Строка-подпись: цифры, не нажимается
-    private func addInfo(to menu: NSMenu, _ text: String) {
-        let item = NSMenuItem(title: text, action: nil, keyEquivalent: "")
-        item.isEnabled = false
-        menu.addItem(item)
+        _ = addItem(to: menu, "Настройки", #selector(showSettings))
+        menu.addItem(NSMenuItem(title: "Выйти из NotchIsland", action: #selector(NSApplication.terminate(_:)),
+                                keyEquivalent: ""))
     }
 
     private func addItem(to menu: NSMenu, _ title: String, _ action: Selector) -> NSMenuItem {
@@ -71,10 +60,13 @@ extension StatusBarController {
 
     @objc func showSettings() { openSettings?() }
 
-    @objc func refreshClaude() { usage.refresh() }
+    @objc func openActivityMonitor(_ sender: NSMenuItem) {
+        guard let raw = sender.representedObject as? String, let s = Stat(rawValue: raw) else { return }
+        ActivityMonitor.open(ActivityMonitor.tab(for: s))
+    }
 
-    @objc func openActivityMonitor() {
-        SystemStats.openActivityMonitor()
+    @objc func openClaudeUsage() {
+        if let url = URL(string: "https://claude.ai/settings/usage") { NSWorkspace.shared.open(url) }
     }
 
     @objc func openBatterySettings() {

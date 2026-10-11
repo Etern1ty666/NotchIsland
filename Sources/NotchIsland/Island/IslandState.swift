@@ -12,12 +12,10 @@ final class IslandState: ObservableObject {
     @Published var notch = CGSize(width: 180, height: 32)
     /// Открыта страница настроек (шестерёнка справа от zzz) — вместо вкладки
     @Published var showSettings = false
-    /// Скачана или найдена новая версия («1.2») — внизу острова кнопка «Обновить»
-    @Published var updateVersion: String?
+    /// Есть обновление или оно ставится — внизу острова полоса с кнопкой и прогрессом
+    @Published var updateBar = false
     /// Показать меню «не засыпать» под кнопкой (её рамка в координатах острова)
     var openAwakeMenu: ((CGRect) -> Void)?
-    /// Нажали «Обновить»
-    var installUpdate: (() -> Void)?
 
     /// Высота раскрытого острова зависит от вкладки; что не влезло, прокручивается.
     /// Настройки открываются в высоте текущей вкладки: если бы остров уменьшился, курсор
@@ -28,7 +26,7 @@ final class IslandState: ObservableObject {
         case .clipboard: tabHeight = Metrics.clipboardHeight
         case .stats: tabHeight = Metrics.statsHeight
         }
-        return tabHeight + (updateVersion == nil ? 0 : Metrics.updateBarHeight)
+        return tabHeight + (updateBar ? Metrics.updateBarHeight : 0)
     }
 
     /// Верхняя строка раскрытого острова: по высоте выреза, но не ниже кнопок
