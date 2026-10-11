@@ -18,6 +18,8 @@ final class ClipboardStore: ObservableObject {
 
     /// Все записи, новые сверху
     @Published private(set) var items: [ClipItem] = []
+    /// macOS не даёт читать папку со скриншотами (в окне доступа нажали «Не разрешать»)
+    @Published private(set) var screenshotsDenied = false
     @Published var retention = ClipRetention(rawValue: UserDefaults.standard.object(forKey: DefaultsKey.clipRetention) as? Int
                                              ?? ClipRetention.forever.rawValue) ?? .forever {
         didSet {
@@ -135,9 +137,15 @@ final class ClipboardStore: ObservableObject {
         // старше срока хранения не берём; при «Всегда» — только за последние сутки
         let age = retention == .forever ? 86400 : TimeInterval(retention.rawValue)
         let cutoff = Date().addingTimeInterval(-age)
-        let urls = (try? FileManager.default.contentsOfDirectory(
-            at: Self.screenshotDir(), includingPropertiesForKeys: [.creationDateKey],
-            options: .skipsHiddenFiles)) ?? []
+        let urls: [URL]
+        do {
+            urls = try FileManager.default.contentsOfDirectory(
+                at: Self.screenshotDir(), includingPropertiesForKeys: [.creationDateKey], options: .skipsHiddenFiles)
+            screenshotsDenied = false
+        } catch {
+            screenshotsDenied = Self.isPermissionError(error)
+            urls = []
+        }
         let found: [(URL, Date)] = urls.compactMap { u in
             let n = u.lastPathComponent.lowercased()
             guard ["png", "jpg", "jpeg", "heic"].contains(u.pathExtension.lowercased()),
@@ -152,6 +160,65 @@ final class ClipboardStore: ObservableObject {
         }
         if seenShots.count > 200 { seenShots.removeFirst(seenShots.count - 200) }
         return items.contains { $0.kind == .screenshot && Date().timeIntervalSince($0.date) < 15 }
+    }
+
+    // MARK: Доступ к папке со скриншотами
+
+    /// «Рабочий стол», «Документы», «Загрузки»; другие папки — как их называет Finder
+    var screenshotFolderName: String {
+        let dir = Self.screenshotDir()
+        switch Self.privacyService(for: dir) {
+        case "SystemPolicyDesktopFolder": return "Рабочий стол"
+        case "SystemPolicyDocumentsFolder": return "Документы"
+        case "SystemPolicyDownloadsFolder": return "Загрузки"
+        default: return FileManager.default.displayName(atPath: dir.path)
+        }
+    }
+
+    /// Кнопка «Разрешить». После отказа macOS сама больше не спрашивает: сбрасываем отказ только
+    /// для нашего приложения — и при следующем чтении папки macOS показывает своё окно снова.
+    /// Если сбросить не вышло — открываем «Конфиденциальность → Файлы и папки»
+    func requestScreenshotAccess() {
+        guard let service = Self.privacyService(for: Self.screenshotDir()),
+              let id = Bundle.main.bundleIdentifier, Self.resetPrivacy(service, for: id) else {
+            return Self.openFilesAndFoldersSettings()
+        }
+        scanScreenshots()
+    }
+
+    /// Защищённые папки и их разрешения в macOS; остальные папки читаются без спроса
+    static func privacyService(for dir: URL) -> String? {
+        let home = FileManager.default.homeDirectoryForCurrentUser.standardizedFileURL.path
+        let path = dir.standardizedFileURL.path
+        func under(_ name: String) -> Bool { path == home + "/" + name || path.hasPrefix(home + "/" + name + "/") }
+        if under("Desktop") { return "SystemPolicyDesktopFolder" }
+        if under("Documents") { return "SystemPolicyDocumentsFolder" }
+        if under("Downloads") { return "SystemPolicyDownloadsFolder" }
+        return nil
+    }
+
+    private static func resetPrivacy(_ service: String, for bundleID: String) -> Bool {
+        let p = Process()
+        p.executableURL = URL(fileURLWithPath: "/usr/bin/tccutil")
+        p.arguments = ["reset", service, bundleID]
+        p.standardOutput = Pipe()
+        p.standardError = Pipe()
+        do { try p.run() } catch { return false }
+        p.waitUntilExit()
+        return p.terminationStatus == 0
+    }
+
+    static func openFilesAndFoldersSettings() {
+        if let url = URL(string: "x-apple.systempreferences:com.apple.preference.security?Privacy_FilesAndFolders") {
+            NSWorkspace.shared.open(url)
+        }
+    }
+
+    private static func isPermissionError(_ error: Error) -> Bool {
+        let e = error as NSError
+        if e.domain == NSCocoaErrorDomain && e.code == NSFileReadNoPermissionError { return true }
+        let posix = (e.userInfo[NSUnderlyingErrorKey] as? NSError) ?? e
+        return posix.domain == NSPOSIXErrorDomain && (posix.code == Int(EPERM) || posix.code == Int(EACCES))
     }
 
     // MARK: Действия

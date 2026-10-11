@@ -1,6 +1,7 @@
 import SwiftUI
 
-/// Вкладка «Буфер»: вся история, новые первыми. Пустой буфер показывает подсказки
+/// Вкладка «Буфер»: вся история, новые первыми; под ней — подсказки.
+/// Если macOS не даёт читать папку со скриншотами — сверху полоска с кнопкой «Разрешить»
 struct ClipboardTab: View {
     @ObservedObject var clip: ClipboardStore
     /// Остров раскрыт — при каждом раскрытии сбрасываем «Скопировано»
@@ -10,10 +11,11 @@ struct ClipboardTab: View {
 
     var body: some View {
         FadingScrollView {
-            if clip.items.isEmpty {
+            VStack(alignment: .leading, spacing: 14) {
+                if clip.screenshotsDenied { accessBanner }
+                if !clip.items.isEmpty { clipGrid(clip.items) }
+                // подсказки — всегда внизу, под записями
                 ClipTips()
-            } else {
-                clipGrid(clip.items)
             }
         }
         .onChange(of: expanded) { open in
@@ -45,5 +47,23 @@ struct ClipboardTab: View {
                          onDrag: { clip.dragProvider(item) })
             }
         }
+    }
+
+    /// Нет доступа к папке со скриншотами — кнопка снова вызывает окно macOS
+    var accessBanner: some View {
+        HStack(spacing: 8) {
+            Image(systemName: "camera.viewfinder")
+                .font(.system(size: 12, weight: .semibold))
+                .foregroundStyle(Theme.warning)
+            Text("Скриншоты не видны — нет доступа к папке «\(clip.screenshotFolderName)»")
+                .font(.system(size: 12))
+                .lineLimit(2)
+            Spacer(minLength: 0)
+            PillButton(title: "Разрешить") { clip.requestScreenshotAccess() }
+            PillButton(title: "Настройки") { ClipboardStore.openFilesAndFoldersSettings() }
+        }
+        .padding(.horizontal, 10)
+        .padding(.vertical, 8)
+        .cardBackground(Theme.warning.opacity(0.12))
     }
 }

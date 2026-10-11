@@ -140,10 +140,14 @@ struct ClipCard: View {
     // Текст, ссылка или файлы
     var plain: some View {
         HStack(spacing: 8) {
+            if item.isLink {
+                Image(systemName: "link")
+                    .font(.system(size: 11, weight: .semibold))
+                    .foregroundStyle(Color.white.opacity(0.45))
+            }
             VStack(alignment: .leading, spacing: 1) {
                 Text(item.preview)
                     .font(.system(size: 12))
-                    .foregroundStyle(item.isLink ? Theme.link : Color.white)
                     .lineLimit(item.kind == .files ? 1 : 4)
                     .truncationMode(item.kind == .files ? .middle : .tail)
                     .multilineTextAlignment(.leading)

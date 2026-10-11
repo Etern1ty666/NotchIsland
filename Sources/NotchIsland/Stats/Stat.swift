@@ -25,10 +25,10 @@ final class StatsSettings: ObservableObject {
     }
 
     init() {
-        // по умолчанию — процессор и память: все пять значков на строке меню MacBook рядом
+        // по умолчанию — процессор и диск: все пять значков на строке меню MacBook рядом
         // с чужими не помещаются, и macOS прячет лишние. Остальное включается булавкой
         let saved = UserDefaults.standard.stringArray(forKey: DefaultsKey.menuStats)
-        pinned = saved.map { Set($0.compactMap(Stat.init(rawValue:))) } ?? [.cpu, .memory]
+        pinned = saved.map { Set($0.compactMap(Stat.init(rawValue:))) } ?? [.cpu, .disk]
         let savedClaude = UserDefaults.standard.stringArray(forKey: DefaultsKey.menuClaude) ?? []
         pinnedClaude = Set(savedClaude.compactMap(ClaudeWidget.init(rawValue:)))
     }
