@@ -6,8 +6,8 @@ struct ImageBox: @unchecked Sendable {
     init(_ image: NSImage?) { self.image = image }
 }
 
-/// Превью картинки целиком (без обрезки). Карточка по форме снимка; если снимок слишком узкий
-/// или широкий и форму пришлось ограничить, по краям — он же, размытый, без пустых полей
+/// Превью снимка на всю карточку. Карточка по форме снимка, так что он виден целиком;
+/// подрезаются только совсем узкие и сверхширокие, чью форму пришлось ограничить
 struct Thumb: View {
     let url: URL
     @State private var img: NSImage?
@@ -15,12 +15,7 @@ struct Thumb: View {
     var body: some View {
         Color.white.opacity(0.07)
             .overlay {
-                if let img {
-                    Image(nsImage: img).resizable().scaledToFill().blur(radius: 14).opacity(0.5)
-                }
-            }
-            .overlay {
-                if let img { Image(nsImage: img).resizable().scaledToFit() }
+                if let img { Image(nsImage: img).resizable().scaledToFill() }
             }
             .clipped()
             .task(id: url) {
@@ -89,7 +84,7 @@ struct ClipActionButton: View {
 struct ClipCard: View {
     /// Высота карточки со снимком; ширина — по пропорциям снимка, но в этих пределах
     static let visualHeight: CGFloat = 96
-    static let visualWidth: ClosedRange<CGFloat> = 110...604
+    static let visualWidth: ClosedRange<CGFloat> = 60...604
 
     let item: ClipItem
     let copied: Bool
@@ -145,10 +140,10 @@ struct ClipCard: View {
     // Текст, ссылка или файлы
     var plain: some View {
         HStack(spacing: 8) {
-            icon.frame(width: 16)
             VStack(alignment: .leading, spacing: 1) {
                 Text(item.preview)
                     .font(.system(size: 12))
+                    .foregroundStyle(item.isLink ? Theme.link : Color.white)
                     .lineLimit(item.kind == .files ? 1 : 4)
                     .truncationMode(item.kind == .files ? .middle : .tail)
                     .multilineTextAlignment(.leading)
@@ -166,7 +161,7 @@ struct ClipCard: View {
         .padding(.trailing, 8)
         .padding(.vertical, 8)
         // не уже, чем нужно кнопкам при наведении, и не ниже одной строки с запасом
-        .frame(minWidth: 120, minHeight: 44, alignment: .leading)
+        .frame(minWidth: 100, minHeight: 44, alignment: .leading)
         .background(cardColor)
         // кнопки и «Скопировано» — поверх конца текста, а не в зарезервированном под них месте:
         // так тексту остаётся вся ширина карточки
@@ -197,50 +192,31 @@ struct ClipCard: View {
         copied ? Color(red: 0.04, green: 0.16, blue: 0.07) : Color(white: hover ? 0.14 : 0.07)
     }
 
-    @ViewBuilder var icon: some View {
-        if copied {
-            Image(systemName: "checkmark.circle.fill").font(.system(size: 12, weight: .medium)).foregroundStyle(Color.green)
-        } else if item.kind == .files, let url = item.urls.first {
-            Image(nsImage: NSWorkspace.shared.icon(forFile: url.path)).resizable().frame(width: 18, height: 18)
-        } else {
-            Image(systemName: item.isLink ? "link" : "text.alignleft")
-                .font(.system(size: 12, weight: .medium))
-                .foregroundStyle(item.isLink ? Theme.link : Color.white.opacity(0.45))
-        }
-    }
-
     // Картинка, скриншот или файл-картинка
     func visual(_ url: URL) -> some View {
         let width = min(max(Self.visualHeight * Thumb.aspect(url), Self.visualWidth.lowerBound),
                         Self.visualWidth.upperBound)
         return Thumb(url: url)
             .frame(width: width, height: Self.visualHeight)
-            .overlay(alignment: .bottom) {
-                HStack(spacing: 4) {
-                    HStack(spacing: 3) {
-                        if item.kind == .screenshot { Image(systemName: "camera.viewfinder").font(.system(size: 9, weight: .bold)) }
-                        timeLabel
-                    }
+            // время и кнопки — каждое в своём углу; в узкой карточке при наведении время уступает место
+            .overlay(alignment: .bottomLeading) {
+                timeLabel
                     .font(.system(size: 10, weight: .semibold))
                     .padding(.horizontal, 6)
                     .padding(.vertical, 2)
                     .background(Capsule().fill(Color.black.opacity(0.6)))
-                    // в узкой карточке время уступает место кнопкам
-                    .opacity(showActions && width < 170 ? 0 : 1)
-                    Spacer(minLength: 0)
-                    actions(onImage: true)
-                }
-                .padding(5)
+                    .padding(5)
+                    .opacity(showActions && width < 150 ? 0 : 1)
+            }
+            .overlay(alignment: .bottomTrailing) {
+                actions(onImage: true).padding(5)
             }
             .overlay {
                 if copied {
                     ZStack {
                         Color.black.opacity(0.55)
-                        VStack(spacing: 4) {
-                            Image(systemName: "checkmark.circle.fill").font(.system(size: 22))
-                            Text("Скопировано").font(.system(size: 11, weight: .semibold))
-                        }
-                        .foregroundStyle(Color.green)
+                        Image(systemName: "checkmark.circle.fill").font(.system(size: 22))
+                            .foregroundStyle(Color.green)
                     }
                 }
             }
