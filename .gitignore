@@ -5,3 +5,7 @@
 /.build/
 /.swiftpm/
 *.xcodeproj/xcuserdata/
+
+# выпуски: копия папки обновлений с сервера и адрес для заливки
+/releases/
+/release.env

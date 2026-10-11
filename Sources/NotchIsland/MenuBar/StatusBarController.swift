@@ -10,6 +10,7 @@ final class StatusBarController: NSObject, NSMenuDelegate {
     let statsSettings: StatsSettings
     let usage: ClaudeUsage
     let awake: KeepAwake
+    let updater: Updater
     /// Каждая статистика — свой значок в строке меню
     var statItems: [Stat: NSStatusItem] = [:]
     /// Лимиты подписки Claude — тоже по значку на окно
@@ -20,11 +21,12 @@ final class StatusBarController: NSObject, NSMenuDelegate {
     var appItem: NSStatusItem?
     var bag = Set<AnyCancellable>()
 
-    init(stats: SystemStats, statsSettings: StatsSettings, usage: ClaudeUsage, awake: KeepAwake) {
+    init(stats: SystemStats, statsSettings: StatsSettings, usage: ClaudeUsage, awake: KeepAwake, updater: Updater) {
         self.stats = stats
         self.statsSettings = statsSettings
         self.usage = usage
         self.awake = awake
+        self.updater = updater
         super.init()
 
         // macOS ставит каждый новый значок левее предыдущих, поэтому создаём справа налево.
@@ -192,6 +194,14 @@ final class StatusBarController: NSObject, NSMenuDelegate {
         login.state = LoginItem.shared.enabled ? .on : .off
         login.isEnabled = LoginItem.shared.available
         menu.addItem(.separator())
+        if let v = updater.availableVersion {
+            _ = addItem(to: menu, "Обновить до версии \(v)", #selector(installUpdate))
+        }
+        _ = addItem(to: menu, "Проверить обновления…", #selector(checkForUpdates))
+        let version = NSMenuItem(title: "NotchIsland \(Updater.currentVersion)", action: nil, keyEquivalent: "")
+        version.isEnabled = false
+        menu.addItem(version)
+        menu.addItem(.separator())
         menu.addItem(withTitle: "Выйти из NotchIsland", action: #selector(NSApplication.terminate(_:)), keyEquivalent: "q")
     }
 
@@ -215,6 +225,10 @@ final class StatusBarController: NSObject, NSMenuDelegate {
     @objc func toggleLogin() {
         LoginItem.shared.set(!LoginItem.shared.enabled)
     }
+
+    @objc func installUpdate() { updater.update() }
+
+    @objc func checkForUpdates() { updater.checkForUpdates() }
 
     @objc func openActivityMonitor() {
         SystemStats.openActivityMonitor()
