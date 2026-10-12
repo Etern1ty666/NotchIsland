@@ -55,9 +55,9 @@ final class IslandController: NSObject {
         hitPanel.contentView = hit
 
         // Окно всегда размера раскрытого острова (плюс запас под тень), меняется только форма внутри (SwiftUI)
-        layout()
         panel.ignoresMouseEvents = true
         hitPanel.ignoresMouseEvents = false   // явно: иначе прозрачное окно пропускает клики насквозь
+        layout()
         hitPanel.orderFrontRegardless()
         panel.orderFrontRegardless()
 
@@ -93,6 +93,26 @@ final class IslandController: NSObject {
         return CGSize(width: 180, height: menuBar > 0 ? menuBar : 24)
     }
 
+    /// Встроенный экран с вырезом включён (крышка открыта), но ни один экран сейчас выреза не показывает
+    static func notchUnused() -> Bool {
+        guard !NSScreen.screens.contains(where: { $0.safeAreaInsets.top > 0 }) else { return false }
+        var ids = [CGDirectDisplayID](repeating: 0, count: 16)
+        var count: UInt32 = 0
+        guard CGGetOnlineDisplayList(UInt32(ids.count), &ids, &count) == .success else { return false }
+        return ids.prefix(Int(count)).contains { CGDisplayIsBuiltin($0) != 0 && CGDisplayIsAsleep($0) == 0 && hasNotch($0) }
+    }
+
+    /// Матрица с вырезом выше 16:10 — над привычной картинкой полоса под вырез
+    /// (3024×1964, 3456×2234, 2560×1664…), у MacBook без выреза ровно 16:10.
+    /// Смотрим самый крупный режим: он не зависит от выбранного разрешения
+    static func hasNotch(_ id: CGDirectDisplayID) -> Bool {
+        let opts = [kCGDisplayShowDuplicateLowResolutionModes: true] as CFDictionary
+        let modes = CGDisplayCopyAllDisplayModes(id, opts) as? [CGDisplayMode] ?? []
+        guard let m = modes.max(by: { $0.pixelWidth * $0.pixelHeight < $1.pixelWidth * $1.pixelHeight }),
+              m.pixelWidth > 0 else { return false }
+        return Double(m.pixelHeight) / Double(m.pixelWidth) > 0.635
+    }
+
     func layout() {
         guard let s = Self.pickScreen() else { return }
         screen = s
@@ -106,6 +126,14 @@ final class IslandController: NSObject {
                               width: island.width + 2 * Metrics.margin.width,
                               height: island.height + Metrics.margin.height), display: true)
         hitPanel.setFrame(collapsedHit, display: false)
+
+        // спрятанному острову окно-ловушка не нужно: оно перехватывало бы клики по строке меню
+        let hidden = Self.notchUnused()
+        if hidden != state.hidden {
+            cancelExpand()
+            state.hidden = hidden
+        }
+        if hidden { hitPanel.orderOut(nil) } else { hitPanel.orderFrontRegardless() }
     }
 
     var collapsedRect: NSRect {
@@ -118,6 +146,13 @@ final class IslandController: NSObject {
     }
     var collapsedHit: NSRect { collapsedRect.insetBy(dx: -2, dy: -2) }
     var expandedHit: NSRect { expandedRect.insetBy(dx: -2, dy: -2) }
+    /// Где курсор будит свёрнутый остров. Спрятанный — только тонкая полоса у самого края
+    /// (курсор, упёртый вверх, туда попадает, а строке меню она не мешает). Когда остров уже выглянул — весь его силуэт.
+    /// Упёртый в край курсор стоит ровно на maxY, а contains верхнюю границу не включает — полоса заходит за край
+    var hoverHit: NSRect {
+        guard state.hidden && !state.peeking else { return collapsedHit }
+        return NSRect(x: collapsedRect.minX, y: screen.frame.maxY - 3, width: collapsedRect.width, height: 5)
+    }
 
     // MARK: Наведение
 
@@ -137,7 +172,7 @@ final class IslandController: NSObject {
                 collapseWork = work
                 DispatchQueue.main.asyncAfter(deadline: .now() + Metrics.leaveDelay, execute: work)
             }
-        } else if collapsedHit.contains(p) {
+        } else if hoverHit.contains(p) {
             // «намерение»: раскрываем, только если курсор задержался на вырезе —
             // так остров не срабатывает, когда мышь просто проезжает к иконкам в строке меню
             guard expandWork == nil else { return }
@@ -145,7 +180,7 @@ final class IslandController: NSObject {
             let work = DispatchWorkItem { [weak self] in
                 guard let self else { return }
                 self.expandWork = nil
-                if !self.state.expanded && self.collapsedHit.contains(NSEvent.mouseLocation) {
+                if !self.state.expanded && self.hoverHit.contains(NSEvent.mouseLocation) {
                     self.expand()
                 } else {
                     self.state.peeking = false

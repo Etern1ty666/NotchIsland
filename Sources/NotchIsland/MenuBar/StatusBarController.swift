@@ -29,6 +29,8 @@ final class StatusBarController: NSObject, NSMenuDelegate {
     var menuKinds: [ObjectIdentifier: MenuKind] = [:]
     /// «Настройки…» — раскрыть остров на настройках; со строкой — прокрутить к ней
     var openSettings: ((String?) -> Void)?
+    /// Слежка за копиями значков на неактивных экранах (dimReplicas)
+    private var replicaWatch: [ObjectIdentifier: [NSKeyValueObservation]] = [:]
 
     init(stats: SystemStats, statsSettings: StatsSettings, usage: ClaudeUsage, awake: KeepAwake) {
         self.stats = stats
@@ -43,14 +45,12 @@ final class StatusBarController: NSObject, NSMenuDelegate {
             .receive(on: DispatchQueue.main)
             .sink { [weak self] _ in self?.updateStatusItems() }
             .store(in: &bag)
-        // с «таблеткой» и без неё у значков разная ширина — заново
+        // с «таблеткой» и без неё у значков разная ширина. Сразу, без receive(on:): значение приходит
+        // до того, как содержимое значков перерисуется
         statsSettings.$menuPill
             .dropFirst()
-            .receive(on: DispatchQueue.main)
-            .sink { [weak self] _ in
-                self?.shown = []
-                self?.updateStatusItems()
-            }
+            .removeDuplicates()
+            .sink { [weak self] pill in self?.pillDidChange(pill) }
             .store(in: &bag)
         statsSettings.$showAppIcon
             .receive(on: DispatchQueue.main)
@@ -85,6 +85,12 @@ final class StatusBarController: NSObject, NSMenuDelegate {
             .dropFirst()
             .receive(on: DispatchQueue.main)
             .sink { [weak self] _ in self?.statsDidUpdate() }
+            .store(in: &bag)
+        // сменился активный экран — кнопки значков переехали на него, а на прежнем появились копии
+        NotificationCenter.default.publisher(for: NSWindow.didChangeScreenNotification)
+            .filter { ($0.object as? NSWindow)?.className == "NSStatusBarWindow" }
+            .receive(on: DispatchQueue.main)
+            .sink { [weak self] _ in self?.dimReplicas() }
             .store(in: &bag)
     }
 
@@ -121,13 +127,23 @@ final class StatusBarController: NSObject, NSMenuDelegate {
         }
     }
 
-    /// Ширина «таблетки» с текущими значениями
-    private func measure(_ s: Stat) -> CGFloat {
-        NSHostingView(rootView: MenuBarStat(stat: s, stats: stats, settings: statsSettings)).fittingSize.width
+    /// Ширина значка с текущими значениями; pill — с подложкой или без, nil — как в настройках
+    private func measure(_ s: Stat, pill: Bool? = nil) -> CGFloat {
+        NSHostingView(rootView: MenuBarStat(stat: s, stats: stats, settings: statsSettings, pill: pill)).fittingSize.width
     }
 
-    private func measure(_ w: ClaudeWidget) -> CGFloat {
-        NSHostingView(rootView: MenuBarClaude(widget: w, usage: usage, settings: statsSettings)).fittingSize.width
+    private func measure(_ w: ClaudeWidget, pill: Bool? = nil) -> CGFloat {
+        NSHostingView(rootView: MenuBarClaude(widget: w, usage: usage, settings: statsSettings, pill: pill)).fittingSize.width
+    }
+
+    private func awakeWidth(pill: Bool? = nil) -> CGFloat {
+        ceil(NSHostingView(rootView: MenuBarAwake(awake: awake, settings: statsSettings, pill: pill)).fittingSize.width + 6)
+    }
+
+    /// Ширина значка Claude: с цифрами — с запасом под двузначные проценты
+    private func claudeWidth(_ w: ClaudeWidget, pill: Bool? = nil) -> CGFloat {
+        let width = ceil(measure(w, pill: pill) + 2)
+        return usage.needsAccount || usage.window(w) == nil ? width : width + 7
     }
 
     func updateStatusItems() {
@@ -144,9 +160,7 @@ final class StatusBarController: NSObject, NSMenuDelegate {
         if wanted != shown { rebuild(wanted) }
 
         awakeItem?.button?.toolTip = awake.statusText
-        if let awakeItem {
-            awakeItem.length = ceil(NSHostingView(rootView: MenuBarAwake(awake: awake, settings: statsSettings)).fittingSize.width + 6)
-        }
+        awakeItem?.length = awakeWidth()
         statsDidUpdate()
         claudeDidUpdate()
     }
@@ -174,7 +188,7 @@ final class StatusBarController: NSObject, NSMenuDelegate {
                 appItem = item
             } else if case .claude(let w) = MenuItem(key: name) {
                 let item = makeItem(slot, kind: .claude(w), content: MenuBarClaude(widget: w, usage: usage, settings: statsSettings))
-                item.length = ceil(measure(w) + 9)   // запас под двузначные проценты
+                item.length = claudeWidth(w)
                 claudeItems[w] = item
             } else if case .stat(let s) = MenuItem(key: name) {
                 let item = makeItem(slot, kind: .stat(s), content: MenuBarStat(stat: s, stats: stats, settings: statsSettings))
@@ -183,6 +197,62 @@ final class StatusBarController: NSObject, NSMenuDelegate {
             }
         }
         shown = wanted
+        // копии на других экранах macOS создаёт не сразу
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) { [weak self] in self?.dimReplicas() }
+    }
+
+    /// Насколько приглушены наши значки на неактивном экране — как системные рядом
+    nonisolated static let inactiveAlpha: CGFloat = 0.5
+
+    /// На неактивном экране macOS приглушает значки строки меню, но свои: наши нарисованы SwiftUI поверх кнопки
+    /// и попадают туда снимком, яркими. У значка по окну на каждый экран: на активном — сама кнопка,
+    /// на остальных — копия (NSStatusItemReplicantView), при смене активного экрана они меняются местами.
+    /// Копии приглушаем сами. macOS накладывает их на строку меню «осветлением» (plusL), которое не замечает
+    /// прозрачность, — его выключаем, и копия становится просто полупрозрачной.
+    /// Значок приложения — шаблонная картинка, его macOS приглушает сама
+    func dimReplicas() {
+        guard appItem == nil else { return }
+        func images(in v: NSView) -> [NSView] {
+            v.className == "NSStatusItemReplicantImageView" ? [v] : v.subviews.flatMap(images)
+        }
+        var seen = Set<ObjectIdentifier>()
+        for w in NSApp.windows where w.className == "NSStatusBarWindow" {
+            guard let content = w.contentView else { continue }
+            for case let layer? in images(in: content).map(\.layer) {
+                let id = ObjectIdentifier(layer)
+                seen.insert(id)
+                Self.dim(layer)
+                // при каждом обновлении значка macOS снова включает «осветление» и прозрачность — возвращаем сразу, в том же кадре
+                if replicaWatch[id] == nil {
+                    replicaWatch[id] = [layer.observe(\.compositingFilter) { layer, _ in Self.dim(layer) },
+                                        layer.observe(\.opacity) { layer, _ in Self.dim(layer) }]
+                }
+            }
+        }
+        replicaWatch = replicaWatch.filter { seen.contains($0.key) }
+    }
+
+    nonisolated static func dim(_ layer: CALayer) {
+        if layer.compositingFilter != nil { layer.compositingFilter = nil }
+        if layer.opacity != Float(inactiveAlpha) { layer.opacity = Float(inactiveAlpha) }
+    }
+
+    /// Подложку включили или выключили — ширина значков заново, на месте. Пересоздавать значки нельзя:
+    /// они на миг пропадают и въезжают заново, наезжая друг на друга.
+    /// Подписка срабатывает до записи значения, содержимое значков перерисуется в конце этого цикла —
+    /// поэтому ширину меряем с явным pill.
+    /// Что станет шире — растягиваем сразу (с запасом в точку), иначе на кадр текст обрежется «…»;
+    /// точную ширину всем ставим после перерисовки. Это заодно обновляет копии значков на неактивных
+    /// экранах: macOS переснимает их при смене ширины, а саму смену подложки может не заметить
+    private func pillDidChange(_ pill: Bool) {
+        var targets: [(NSStatusItem, CGFloat)] = []
+        for (s, item) in statItems { targets.append((item, ceil(measure(s, pill: pill) + reserve(s)))) }
+        for (w, item) in claudeItems { targets.append((item, claudeWidth(w, pill: pill))) }
+        if let awakeItem { targets.append((awakeItem, awakeWidth(pill: pill))) }
+        for (item, width) in targets where width >= item.length { item.length = width + 1 }
+        DispatchQueue.main.async {
+            for (item, width) in targets { item.length = width }
+        }
     }
 
     /// Ширина значков Claude: в пределах одного вида только растёт (цифры не дёргают соседей),
@@ -190,12 +260,12 @@ final class StatusBarController: NSObject, NSMenuDelegate {
     func claudeDidUpdate() {
         for (w, item) in claudeItems {
             let look = usage.needsAccount ? "account" : (usage.window(w) == nil ? "empty" : "data")
-            let width = ceil(measure(w) + 2)
             if claudeLooks[w] != look {
                 claudeLooks[w] = look
-                item.length = look == "data" ? width + 7 : width   // запас под двузначные проценты
-            } else if width > item.length {
-                item.length = width
+                item.length = claudeWidth(w)
+            } else {
+                let width = ceil(measure(w) + 2)
+                if width > item.length { item.length = width }
             }
             item.button?.toolTip = usage.summary(w)
         }
@@ -207,6 +277,8 @@ final class StatusBarController: NSObject, NSMenuDelegate {
             if w > item.length { item.length = w }
             item.button?.toolTip = stats.summary(s)
         }
+        // подстраховка: копии, появившиеся без уведомления, — на следующем замере
+        dimReplicas()
     }
 
     /// Иконка-тумблер для строки меню: белая «таблетка» с вырезом-ручкой справа.

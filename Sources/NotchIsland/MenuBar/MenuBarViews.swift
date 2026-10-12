@@ -7,9 +7,34 @@ extension View {
     func menuBarPill(_ on: Bool, padding: CGFloat = 8, scheme: ColorScheme) -> some View {
         self.padding(.horizontal, on ? padding : 3)
             .frame(height: 22)
-            .background(Capsule().fill(on ? Theme.menuBarPill : .clear))
+            .background { if on { MenuBarPillBackground() } }
             .environment(\.colorScheme, on ? .dark : scheme)
     }
+}
+
+/// «Таблетка» под значком: размытое то, что под строкой меню, притемнённое — читается на любых обоях
+struct MenuBarPillBackground: View {
+    var body: some View {
+        ZStack {
+            BehindWindowBlur()
+            Theme.menuBarPill.opacity(0.55)
+        }
+        .clipShape(Capsule())
+    }
+}
+
+/// Системное размытие того, что под окном (SwiftUI-материалы размывают только содержимое своего окна)
+struct BehindWindowBlur: NSViewRepresentable {
+    func makeNSView(context: Context) -> NSVisualEffectView {
+        let v = NSVisualEffectView()
+        v.blendingMode = .behindWindow
+        v.material = .hudWindow
+        v.state = .active
+        v.appearance = NSAppearance(named: .darkAqua)
+        return v
+    }
+
+    func updateNSView(_ v: NSVisualEffectView, context: Context) {}
 }
 
 /// Основной цвет значка: на «таблетке» всегда белый, без неё — как текст строки меню
@@ -23,14 +48,17 @@ struct MenuBarStat: View {
     @ObservedObject var stats: SystemStats
     @ObservedObject var settings: StatsSettings
     /// Оформление строки меню (светлая или тёмная) — macOS сама меняет его под обои
+    /// С подложкой или без; nil — как в настройках. Явно — для замера ширины до переключения
+    var pill: Bool? = nil
     @Environment(\.colorScheme) private var scheme
-    var ink: Color { menuBarInk(pill: settings.menuPill, scheme: scheme) }
+    var onPill: Bool { pill ?? settings.menuPill }
+    var ink: Color { menuBarInk(pill: onPill, scheme: scheme) }
 
     var body: some View {
         Group {
             if stat == .battery { battery } else { gauged }
         }
-        .menuBarPill(settings.menuPill, scheme: scheme)
+        .menuBarPill(onPill, scheme: scheme)
         .animation(.easeOut(duration: 0.3), value: stats.color(stat))
     }
 
@@ -161,8 +189,11 @@ struct MenuBarClaude: View {
     let widget: ClaudeWidget
     @ObservedObject var usage: ClaudeUsage
     @ObservedObject var settings: StatsSettings
+    /// С подложкой или без; nil — как в настройках. Явно — для замера ширины до переключения
+    var pill: Bool? = nil
     @Environment(\.colorScheme) private var scheme
-    var ink: Color { menuBarInk(pill: settings.menuPill, scheme: scheme) }
+    var onPill: Bool { pill ?? settings.menuPill }
+    var ink: Color { menuBarInk(pill: onPill, scheme: scheme) }
 
     var body: some View {
         let w = usage.window(widget)
@@ -187,7 +218,7 @@ struct MenuBarClaude: View {
                 if let w { percentText(w.spent, size: 12, warn: false, color: claudeNumberColor(w), ink: ink) }
             }
         }
-        .menuBarPill(settings.menuPill, scheme: scheme)
+        .menuBarPill(onPill, scheme: scheme)
         .animation(.easeOut(duration: 0.3), value: claudeColor(w))
     }
 
@@ -210,17 +241,19 @@ struct MenuBarClaude: View {
 struct MenuBarAwake: View {
     @ObservedObject var awake: KeepAwake
     @ObservedObject var settings: StatsSettings
+    var pill: Bool? = nil
     @Environment(\.colorScheme) private var scheme
+    var onPill: Bool { pill ?? settings.menuPill }
 
     var body: some View {
         // значок есть, только пока режим включён (StatusBarController)
-        if awake.active { pill }
+        if awake.active { badge }
     }
 
-    var pill: some View {
+    var badge: some View {
         HStack(spacing: 4) {
-            // без «таблетки» черта прорезает буквы насквозь — под ней видна строка меню
-            SleepIcon(slashed: true, size: 11, background: settings.menuPill ? Theme.menuBarPill : nil)
+            // черта прорезает буквы насквозь — под ней видна подложка или строка меню
+            SleepIcon(slashed: true, size: 11)
             // выбран срок — рядом обратный отсчёт; ширина под две цифры, чтобы соседи не прыгали
             if let until = awake.until {
                 TimelineView(.periodic(from: .now, by: 1)) { context in
@@ -233,7 +266,7 @@ struct MenuBarAwake: View {
             }
         }
         .foregroundStyle(Theme.awake)
-        .menuBarPill(settings.menuPill, padding: 9, scheme: scheme)
+        .menuBarPill(onPill, padding: 9, scheme: scheme)
     }
 }
 

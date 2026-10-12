@@ -18,8 +18,12 @@ struct IslandView: View {
         // В покое плавные «ушки» даёт сам вырез. Подросший остров выходит за них —
         // рисуем свои, иначе по бокам торчат прямые углы
         let flare: CGFloat = ex ? Metrics.flareExpanded : (peek ? Metrics.flarePeek : 0)
-        let bodyW: CGFloat = ex ? Metrics.expanded.width : state.notch.width + (peek ? Metrics.peek.width : 0)
-        let h: CGFloat = ex ? state.expandedHeight : state.notch.height + (peek ? Metrics.peek.height : 0)
+        let bodyW: CGFloat = ex ? Metrics.expanded.width
+            : state.notch.width + (peek && !state.hidden ? Metrics.peek.width : 0)
+        // спрятанный остров в покое — нулевой высоты, а выглядывая, сразу выскакивает из края язычком
+        let h: CGFloat = ex ? state.expandedHeight
+            : state.hidden ? (peek ? Metrics.hiddenPeekHeight : 0)
+            : state.notch.height + (peek ? Metrics.peek.height : 0)
         let shape = IslandShape(top: flare, bottom: ex ? 24 : (peek ? 12 : 10))
 
         ZStack(alignment: .top) {
@@ -42,7 +46,7 @@ struct IslandView: View {
         // Под островом (видна только снаружи, поверх содержимого не ложится) и исчезает сразу,
         // без затухания, — пока остров раскрывается, её уже нет
         .background {
-            if state.showHint && !ex {
+            if state.showHint && !ex && !state.hidden {
                 HintGlow(shape: shape).transition(.identity)
             }
         }
@@ -53,7 +57,8 @@ struct IslandView: View {
             // SwiftUI-анимация прерываема: при смене состояния она идёт от текущего значения
             .animation(ex ? Metrics.spring : Metrics.collapse, value: ex)
             // пока курсор ждёт на вырезе, остров плавно подрастает ровно за время задержки
-            .animation(peek ? .easeOut(duration: Metrics.hoverDelay) : Metrics.collapse, value: peek)
+            .animation(peek ? (state.hidden ? Metrics.hiddenPeekPop : .easeOut(duration: Metrics.hoverDelay))
+                       : Metrics.collapse, value: peek)
     }
 
     var panelContent: some View {

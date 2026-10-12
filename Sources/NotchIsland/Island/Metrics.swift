@@ -15,6 +15,9 @@ enum Metrics {
     static let flarePeek: CGFloat = 6
     /// Насколько остров «подрастает», пока курсор ждёт на вырезе
     static let peek = CGSize(width: 12, height: 3)
+    /// Спрятанный остров (вырез не используется): курсор у края — сразу выскакивает язычок такой высоты
+    static let hiddenPeekHeight: CGFloat = 10
+    static let hiddenPeekPop = Animation.spring(response: 0.2, dampingFraction: 0.8)
     /// Прозрачный запас вокруг раскрытого острова: под тень и «пружину» анимации
     static let margin = CGSize(width: 24, height: 32)
 
