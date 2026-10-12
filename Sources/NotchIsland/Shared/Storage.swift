@@ -26,6 +26,8 @@ enum DefaultsKey {
     static let claudeAccount = "claudeAccountEnabled"
     /// Буфер: срок хранения истории
     static let clipRetention = "clipRetention"
+    /// Буфер: показывать подсказки под записями
+    static let clipTips = "clipTips"
     /// Версия, в которой остров уже раскрывали: после установки и каждого обновления
     /// вокруг выреза снова зелёная подсказка
     static let islandHintVersion = "islandHintVersion"

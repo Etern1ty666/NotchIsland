@@ -16,18 +16,18 @@ struct SectionHeader: View {
     }
 }
 
-/// Общий вид карточки: значок и заголовок, крупное значение, шкала, строка подробностей
+/// Общий вид карточки: значок и заголовок, крупное значение, шкала, строка подробностей.
+/// Нажатие на карточку — подробности; булавка в углу — показывать ли её значок в строке меню
 struct CardLayout<Value: View>: View {
     let icon: String
     let title: String
     let color: Color
     let gauge: Gauge
     let detail: String
-    /// nil — карточку нельзя закрепить в строке меню; иначе клик по карточке закрепляет и открепляет
-    var pinned: Bool? = nil
-    var onPin: () -> Void = {}
-    /// Свой клик по карточке (например, «нет входа — открыть настройки») — вместо закрепления
-    var onTap: (() -> Void)? = nil
+    let pinned: Bool
+    let onPin: () -> Void
+    /// Подробности (меню как у значка в строке меню) или, если данных нет, настройки
+    let onTap: () -> Void
     @ViewBuilder let value: () -> Value
     @State private var hover = false
 
@@ -42,17 +42,10 @@ struct CardLayout<Value: View>: View {
                     .foregroundStyle(Color.white.opacity(0.6))
                     .lineLimit(1)
                 Spacer(minLength: 0)
-                if onTap == nil, let pinned {
-                    Image(systemName: pinned ? "pin.fill" : "pin")
-                        .font(.system(size: 10, weight: .semibold))
-                        .foregroundStyle(pinned ? Color.white : Color.white.opacity(hover ? 0.6 : 0.3))
-                        .frame(width: 18, height: 18)
-                } else if onTap != nil {
-                    Image(systemName: "chevron.right")
-                        .font(.system(size: 9, weight: .bold))
-                        .foregroundStyle(Color.white.opacity(hover ? 0.6 : 0.3))
-                        .frame(width: 18, height: 18)
-                }
+                PinButton(pinned: pinned, action: onPin)
+                    // кружок крупнее строки заголовка — карточка от него не растёт
+                    .padding(.vertical, -4)
+                    .padding(.trailing, -3)
             }
             value()
                 .lineLimit(1)
@@ -72,20 +65,36 @@ struct CardLayout<Value: View>: View {
         .cardBackground(Color.white.opacity(hover ? 0.1 : 0.07))
         .contentShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
         .onHover { hover = $0 }
-        .onTapGesture { if let onTap { onTap() } else if pinned != nil { onPin() } }
-        .help(helpText)
+        .onTapGesture(perform: onTap)
+        .help(detail + "\n" + L("Нажатие — подробности"))
         .accessibilityElement(children: .combine)
         .accessibilityAddTraits(.isButton)
-        .accessibilityHint(pinHint ?? "")
+        .accessibilityAction(named: pinned ? L("Убрать из строки меню") : L("Показывать в строке меню"), onPin)
         .animation(.easeOut(duration: 0.3), value: color)
     }
+}
 
-    private var pinHint: String? {
-        guard onTap == nil, let pinned else { return nil }
-        return pinned ? L("Нажатие — убрать из строки меню") : L("Нажатие — показывать в строке меню")
-    }
+/// Булавка карточки: показывать ли её значок в строке меню. Всегда в кружке — видно, что это кнопка;
+/// закреплённая — белая заливка с тёмной булавкой, заметна издалека
+struct PinButton: View {
+    let pinned: Bool
+    let action: () -> Void
+    @State private var hover = false
 
-    private var helpText: String {
-        pinHint.map { detail + "\n" + $0 } ?? detail
+    var body: some View {
+        Button(action: action) {
+            Image(systemName: pinned ? "pin.fill" : "pin")
+                .font(.system(size: 10, weight: .bold))
+                .rotationEffect(.degrees(45))
+                .foregroundStyle(pinned ? Color.black : Color.white.opacity(hover ? 1 : 0.75))
+                .frame(width: 22, height: 22)
+                .background(Circle().fill(pinned ? Color.white.opacity(hover ? 0.8 : 0.95)
+                                                 : Color.white.opacity(hover ? 0.22 : 0.12)))
+                .contentShape(Circle())
+        }
+        .buttonStyle(.plain)
+        .onHover { hover = $0 }
+        .help(pinned ? L("Показывается в строке меню. Нажатие — убрать") : L("Показывать в строке меню"))
+        .animation(.easeOut(duration: 0.15), value: pinned)
     }
 }

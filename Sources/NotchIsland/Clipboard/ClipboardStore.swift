@@ -27,6 +27,22 @@ final class ClipboardStore: ObservableObject {
             prune()
         }
     }
+    /// Подсказки под записями; спрятать — кнопкой у их заголовка, вернуть — в настройках
+    @Published var showTips = UserDefaults.standard.object(forKey: DefaultsKey.clipTips) as? Bool ?? true {
+        didSet { UserDefaults.standard.set(showTips, forKey: DefaultsKey.clipTips) }
+    }
+
+    /// Удалённое крестиком или «Очистить историю» — ещё можно вернуть (плашка «Вернуть»)
+    struct Deletion: Equatable {
+        let id = UUID()
+        let items: [ClipItem]
+        /// Очистили всю историю, а не одну запись
+        let all: Bool
+    }
+    @Published private(set) var deletion: Deletion?
+    /// Сколько держится «Вернуть»; потом копии картинок стираются с диска
+    static let undoTime: TimeInterval = 5
+    private var deletionWork: DispatchWorkItem?
 
     private var lastCount = NSPasteboard.general.changeCount
     /// Скриншоты, которые уже побывали в ленте: удалённый из ленты не вернётся
@@ -288,7 +304,43 @@ final class ClipboardStore: ObservableObject {
         return item.urls.first.flatMap { NSItemProvider(contentsOf: $0) } ?? NSItemProvider()
     }
 
-    func remove(_ item: ClipItem) { remove([item]) }
+    /// Крестик на записи и «Очистить историю»: записи пропадают сразу, но несколько секунд их можно вернуть.
+    /// Вернуть можно только последнее удаление
+    func delete(_ gone: [ClipItem], all: Bool = false) {
+        guard !gone.isEmpty else { return }
+        commitDeletion()
+        let ids = Set(gone.map(\.id))
+        items.removeAll { ids.contains($0.id) }
+        save()
+        deletion = Deletion(items: gone, all: all)
+        let work = DispatchWorkItem { [weak self] in self?.commitDeletion() }
+        deletionWork = work
+        DispatchQueue.main.asyncAfter(deadline: .now() + Self.undoTime, execute: work)
+    }
+
+    func clearHistory() { delete(items, all: true) }
+
+    /// «Вернуть»: записи встают на свои места по времени. Скопированное заново за эти секунды не дублируем
+    func undoDeletion() {
+        guard let d = deletion else { return }
+        deletionWork?.cancel()
+        deletionWork = nil
+        deletion = nil
+        for item in d.items where !items.contains(where: { $0.identity == item.identity }) {
+            items.insert(item, at: items.firstIndex { $0.date < item.date } ?? items.count)
+        }
+        prune()
+        save()
+    }
+
+    /// Вернуть уже нельзя — стираем копии картинок
+    private func commitDeletion() {
+        deletionWork?.cancel()
+        deletionWork = nil
+        guard let d = deletion else { return }
+        deletion = nil
+        deleteImages(of: d.items)
+    }
 
     /// Убираем просроченное (если срок не «Всегда») и лишнее сверх лимита
     func prune() {
@@ -307,10 +359,16 @@ final class ClipboardStore: ObservableObject {
         guard !gone.isEmpty else { return }
         let ids = Set(gone.map(\.id))
         items.removeAll { ids.contains($0.id) }
-        // копии картинок — наши, удаляем; файлы и скриншоты на диске не трогаем
-        let files = gone.filter { $0.kind == .image }.compactMap(\.urls.first)
-        io.async { files.forEach { try? FileManager.default.removeItem(at: $0) } }
+        deleteImages(of: gone)
         save()
+    }
+
+    /// Копии картинок — наши, удаляем, если на ту же копию не ссылается запись в ленте (картинку могли
+    /// скопировать снова); файлы и скриншоты на диске не трогаем
+    private func deleteImages(of gone: [ClipItem]) {
+        let used = Set(items.flatMap(\.urls))
+        let files = gone.filter { $0.kind == .image }.compactMap(\.urls.first).filter { !used.contains($0) }
+        io.async { files.forEach { try? FileManager.default.removeItem(at: $0) } }
     }
 
     // MARK: Диск

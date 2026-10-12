@@ -46,6 +46,30 @@ struct PillButton: View {
     }
 }
 
+/// Маленькая текстовая кнопка рядом с заголовком раздела («Спрятать»): не выше строки заголовка
+struct HeaderButton: View {
+    let title: String
+    var help: String?
+    let action: () -> Void
+    @State private var hover = false
+
+    var body: some View {
+        Button(action: action) {
+            Text(L(title))
+                .font(.system(size: 10, weight: .semibold))
+                .foregroundStyle(Color.white.opacity(hover ? 0.9 : 0.55))
+                .padding(.horizontal, 7)
+                .frame(height: 18)
+                .background(Capsule().fill(Color.white.opacity(hover ? 0.14 : 0.07)))
+                .contentShape(Capsule())
+        }
+        .buttonStyle(.plain)
+        .onHover { hover = $0 }
+        .padding(.vertical, -3)   // строка не выше обычного заголовка
+        .help(L(help ?? ""))
+    }
+}
+
 /// Маленькая кнопка «обновить»: закруглённая стрелка, при нажатии делает оборот
 struct RefreshButton: View {
     let busy: Bool

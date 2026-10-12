@@ -1,12 +1,14 @@
 import SwiftUI
 
-/// Два раздела: система и лимиты подписки Claude. Клик по карточке — показывать ли её в строке меню.
-/// Остров одной высоты на всех вкладках, поэтому раздел прокручивается
+/// Два раздела: система и лимиты подписки Claude. Клик по карточке — подробности, как в меню её значка;
+/// булавка — показывать ли значок в строке меню. Что не влезло по высоте, прокручивается
 struct StatsTab: View {
     @ObservedObject var stats: SystemStats
     @ObservedObject var settings: StatsSettings
     @ObservedObject var usage: ClaudeUsage
     let openSettings: () -> Void
+    /// Подробности карточки — меню у курсора
+    let openDetails: (MenuItem) -> Void
 
     var body: some View {
         let columns = Array(repeating: GridItem(.flexible(), spacing: 8), count: 3)
@@ -15,7 +17,8 @@ struct StatsTab: View {
                 SectionHeader(icon: "desktopcomputer", title: "Система")
                 LazyVGrid(columns: columns, spacing: 8) {
                     ForEach(stats.available) { s in
-                        StatCard(stat: s, stats: stats, pinned: settings.pinned.contains(s)) { settings.toggle(s) }
+                        StatCard(stat: s, stats: stats, pinned: settings.pinned.contains(s),
+                                 onPin: { settings.toggle(s) }, onTap: { openDetails(.stat(s)) })
                     }
                 }
                 HStack(spacing: 6) {
@@ -33,7 +36,8 @@ struct StatsTab: View {
                 LazyVGrid(columns: columns, spacing: 8) {
                     ForEach(ClaudeWidget.allCases) { w in
                         ClaudeWindowCard(usage: usage, widget: w, pinned: settings.pinnedClaude.contains(w),
-                                         onPin: { settings.toggle(w) }, openSettings: openSettings)
+                                         onPin: { settings.toggle(w) },
+                                         onTap: usage.needsAccount ? openSettings : { openDetails(.claude(w)) })
                     }
                 }
             }
@@ -46,10 +50,11 @@ struct StatCard: View {
     @ObservedObject var stats: SystemStats
     let pinned: Bool
     let onPin: () -> Void
+    let onTap: () -> Void
 
     var body: some View {
         CardLayout(icon: stats.icon(stat), title: stat.title, color: stats.color(stat),
-                   gauge: stats.gauge(stat), detail: detail, pinned: pinned, onPin: onPin) {
+                   gauge: stats.gauge(stat), detail: detail, pinned: pinned, onPin: onPin, onTap: onTap) {
             value
         }
     }

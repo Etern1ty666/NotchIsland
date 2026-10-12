@@ -1,7 +1,10 @@
 import SwiftUI
 
-/// Подсказки вместо пустого буфера — карточками, как в Gboard
+/// Подсказки под записями буфера — карточками, как в Gboard. «Спрятать» у заголовка убирает их
+/// (вернуть — в настройках)
 struct ClipTips: View {
+    let onHide: () -> Void
+
     var tips: [(icon: String, text: String)] {
         [
             ("doc.on.clipboard", L("Всё скопированное — текст, ссылки, картинки и файлы — появляется здесь")),
@@ -13,7 +16,10 @@ struct ClipTips: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 8) {
-            SectionHeader(icon: "lightbulb", title: "Подсказки")
+            HStack(spacing: 6) {
+                SectionHeader(icon: "lightbulb", title: "Подсказки")
+                HeaderButton(title: "Спрятать", help: "Вернуть подсказки можно в настройках", action: onHide)
+            }
             LazyVGrid(columns: [GridItem(.flexible(), spacing: 8), GridItem(.flexible(), spacing: 8)], spacing: 8) {
                 ForEach(tips, id: \.icon) { tip in
                     HStack(alignment: .top, spacing: 10) {

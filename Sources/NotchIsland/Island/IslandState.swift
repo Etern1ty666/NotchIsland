@@ -21,8 +21,10 @@ final class IslandState: ObservableObject {
     @Published var showHint = UserDefaults.standard.string(forKey: DefaultsKey.islandHintVersion) != Updater.currentVersion
     /// Есть обновление или оно ставится — внизу острова полоса с кнопкой и прогрессом
     @Published var updateBar = false
-    /// Показать меню «не засыпать» под кнопкой (её рамка в координатах острова)
-    var openAwakeMenu: ((CGRect) -> Void)?
+    /// Показать меню под кнопкой (её рамка в координатах острова) или, без рамки, у курсора
+    var openMenu: ((NSMenu, CGRect?) -> Void)?
+    /// Меню карточки статистики или Claude — те же подробности, что у её значка в строке меню
+    var cardMenu: ((MenuItem) -> NSMenu)?
 
     /// Высота раскрытого острова зависит от вкладки; что не влезло, прокручивается.
     /// Настройки открываются в высоте текущей вкладки: если бы остров уменьшился, курсор

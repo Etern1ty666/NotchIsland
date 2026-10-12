@@ -26,6 +26,19 @@ struct SettingsView: View {
                 SettingsRow(icon: "clock.arrow.circlepath", title: "Хранить историю") {
                     SegmentPicker(options: ClipRetention.allCases.map { ($0, $0.title) }, selection: $clip.retention)
                 }
+                SettingsRow(icon: "lightbulb", title: "Подсказки", help: "Карточки с подсказками под записями буфера") {
+                    SegmentPicker(options: [(false, "Выкл"), (true, "Вкл")], selection: $clip.showTips)
+                }
+                SettingsRow(icon: "trash", title: "Очистить историю", help: clearHelp) {
+                    // несколько секунд после очистки — «Вернуть», как плашка на вкладке буфера
+                    if clip.deletion?.all == true {
+                        PillButton(title: "Вернуть") { clip.undoDeletion() }
+                    } else {
+                        PillButton(title: "Очистить", destructive: true) { clip.clearHistory() }
+                            .disabled(clip.items.isEmpty)
+                            .opacity(clip.items.isEmpty ? 0.5 : 1)
+                    }
+                }
 
                 section("Строка меню", icon: "menubar.rectangle")
                 menuBarItems
@@ -65,6 +78,13 @@ struct SettingsView: View {
 
     func section(_ title: String, icon: String) -> some View {
         SectionHeader(icon: icon, title: title).padding(.top, 6)
+    }
+
+    /// «В истории 42 записи» — сколько уйдёт; скриншоты на диске остаются
+    var clearHelp: String {
+        guard !clip.items.isEmpty else { return L("История пуста") }
+        let n = countText(clip.items.count, ru: ("запись", "записи", "записей"), en: ("item", "items"))
+        return L("В истории %@. Скриншоты и файлы на диске останутся", n)
     }
 
     // MARK: Строка меню

@@ -28,6 +28,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         let statusBar = StatusBarController(stats: stats, statsSettings: statsSettings, usage: usage,
                                             awake: controller.awake)
         statusBar.openSettings = { [weak controller] in controller?.showSettings(at: $0) }
+        // клик по карточке на острове — то же меню подробностей, что у её значка
+        controller.state.cardMenu = { [weak statusBar] in statusBar?.cardMenu($0) ?? NSMenu() }
         self.statusBar = statusBar
 
         // новая версия — полоса с кнопкой и прогрессом внизу острова

@@ -11,13 +11,13 @@ func claudeNumberColor(_ w: UsageWindow) -> Color? {
     (w.spent * 100).rounded() > 0 ? nil : claudeColor(w)
 }
 
-/// Окно лимита подписки: сколько израсходовано, когда обнулится. Без данных — клик ведёт в настройки
+/// Окно лимита подписки: сколько израсходовано, когда обнулится. Клик — подробности, без аккаунта — настройки
 struct ClaudeWindowCard: View {
     @ObservedObject var usage: ClaudeUsage
     let widget: ClaudeWidget
     let pinned: Bool
     let onPin: () -> Void
-    let openSettings: () -> Void
+    let onTap: () -> Void
 
     var window: UsageWindow? { usage.window(widget) }
 
@@ -25,8 +25,7 @@ struct ClaudeWindowCard: View {
         let spent = window?.spent ?? 0
         // шкала заполняется по мере расхода
         CardLayout(icon: "sparkles", title: widget.title, color: claudeColor(window),
-                   gauge: .bar(spent), detail: detail, pinned: pinned, onPin: onPin,
-                   onTap: window == nil ? openSettings : nil) {
+                   gauge: .bar(spent), detail: detail, pinned: pinned, onPin: onPin, onTap: onTap) {
             if let window {
                 Text("\(percentText(window.spent, size: 20, warn: false, color: claudeNumberColor(window)))\(Text(" " + L("израсходовано")).font(.system(size: 11, weight: .medium)).foregroundColor(.white.opacity(0.45)))")
             } else {

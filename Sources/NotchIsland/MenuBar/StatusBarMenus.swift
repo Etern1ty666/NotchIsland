@@ -2,7 +2,8 @@ import AppKit
 
 /// Меню значков в строке меню — у каждого своё: сверху подробные цифры, дальше кнопки:
 /// открыть свой раздел («Мониторинг системы» на нужной вкладке, настройки аккумулятора, лимиты
-/// на claude.ai), «Спрятать», «Настройки» и «Выйти из NotchIsland». У zzz — сроки режима
+/// на claude.ai), «Спрятать», «Настройки» и «Выйти из NotchIsland». У zzz — сроки режима.
+/// Те же подробности — по клику на карточку на острове (cardMenu)
 extension StatusBarController {
     enum MenuKind {
         case app, awake
@@ -17,37 +18,58 @@ extension StatusBarController {
         switch menuKinds[ObjectIdentifier(menu)] ?? .app {
         case .app:
             // значок приложения виден, только когда других нет; вернуть — в настройках, «Строка меню»
-            _ = addItem(to: menu, "Спрятать", #selector(hideAppIcon))
+            addItem(to: menu, "Спрятать", #selector(hideAppIcon))
         case .awake:
             addHeader(to: menu, [(KeepAwake.title, [awake.remainingText])])
             awake.fill(menu, header: false)
         case .stat(let s):
+            addDetails(to: menu, .stat(s))
+            addItem(to: menu, "Спрятать", #selector(togglePin(_:))).representedObject = MenuItem.stat(s).key
+        case .claude(let w):
+            addDetails(to: menu, .claude(w))
+            addItem(to: menu, "Спрятать", #selector(togglePin(_:))).representedObject = MenuItem.claude(w).key
+        }
+        if !menu.items.isEmpty { menu.addItem(.separator()) }
+        addItem(to: menu, "Настройки", #selector(showSettings))
+        menu.addItem(NSMenuItem(title: L("Выйти из NotchIsland"), action: #selector(NSApplication.terminate(_:)),
+                                keyEquivalent: ""))
+    }
+
+    /// Меню карточки на острове: подробности и кнопки как у её значка, вместо «Спрятать» —
+    /// «Показывать в строке меню» с галочкой
+    func cardMenu(_ item: MenuItem) -> NSMenu {
+        let menu = NSMenu()
+        menu.autoenablesItems = false
+        addDetails(to: menu, item)
+        menu.addItem(.separator())
+        let pin = addItem(to: menu, "Показывать в строке меню", #selector(togglePin(_:)))
+        pin.representedObject = item.key
+        pin.state = statsSettings.menuOrder.contains(item) ? .on : .off
+        return menu
+    }
+
+    /// Подробные цифры и «открыть свой раздел»
+    private func addDetails(to menu: NSMenu, _ item: MenuItem) {
+        switch item {
+        case .stat(let s):
             // заголовок: главная цифра жирно, под ней подробности
             addHeader(to: menu, [stats.menuHeader(s)])
             if s == .battery {
-                _ = addItem(to: menu, "Открыть настройки аккумулятора", #selector(openBatterySettings))
+                addItem(to: menu, "Открыть настройки аккумулятора", #selector(openBatterySettings))
             } else {
-                let open = addItem(to: menu, "Открыть «Мониторинг системы»", #selector(openActivityMonitor(_:)))
-                open.representedObject = s.rawValue
+                addItem(to: menu, "Открыть «Мониторинг системы»", #selector(openActivityMonitor(_:)))
+                    .representedObject = s.rawValue
             }
-            let hide = addItem(to: menu, "Спрятать", #selector(toggleStat(_:)))
-            hide.representedObject = s.rawValue
         case .claude(let w):
             // заголовок: оба окна — сколько израсходовано и через сколько сброс
             if !usage.needsAccount { addHeader(to: menu, ClaudeWidget.allCases.map(claudeHeader)) }
             if usage.needsAccount {
-                _ = addItem(to: menu, "Подключить Claude", #selector(connectClaude))
+                addItem(to: menu, "Подключить Claude", #selector(connectClaude))
             } else if usage.window(w) == nil {
-                _ = addItem(to: menu, "Обновить", #selector(refreshClaude))
+                addItem(to: menu, "Обновить", #selector(refreshClaude))
             }
-            _ = addItem(to: menu, "Открыть лимиты на claude.ai", #selector(openClaudeUsage))
-            let hide = addItem(to: menu, "Спрятать", #selector(toggleClaude(_:)))
-            hide.representedObject = w.rawValue
+            addItem(to: menu, "Открыть лимиты на claude.ai", #selector(openClaudeUsage))
         }
-        if !menu.items.isEmpty { menu.addItem(.separator()) }
-        _ = addItem(to: menu, "Настройки", #selector(showSettings))
-        menu.addItem(NSMenuItem(title: L("Выйти из NotchIsland"), action: #selector(NSApplication.terminate(_:)),
-                                keyEquivalent: ""))
     }
 
     /// Окно лимита Claude для заголовка: «Сессия · 5 ч — израсходовано 42%» и «Сброс через 2 ч 10 мин»
@@ -78,6 +100,7 @@ extension StatusBarController {
         menu.addItem(item)
     }
 
+    @discardableResult
     private func addItem(to menu: NSMenu, _ title: String, _ action: Selector) -> NSMenuItem {
         let item = NSMenuItem(title: L(title), action: action, keyEquivalent: "")
         item.target = self
@@ -87,14 +110,10 @@ extension StatusBarController {
 
     // MARK: Действия
 
-    @objc func toggleStat(_ sender: NSMenuItem) {
-        guard let raw = sender.representedObject as? String, let s = Stat(rawValue: raw) else { return }
-        statsSettings.toggle(s)
-    }
-
-    @objc func toggleClaude(_ sender: NSMenuItem) {
-        guard let raw = sender.representedObject as? String, let w = ClaudeWidget(rawValue: raw) else { return }
-        statsSettings.toggle(w)
+    /// «Спрятать» у значка и «Показывать в строке меню» у карточки
+    @objc func togglePin(_ sender: NSMenuItem) {
+        guard let key = sender.representedObject as? String, let item = MenuItem(key: key) else { return }
+        statsSettings.toggle(item)
     }
 
     @objc func showSettings() { openSettings?(nil) }

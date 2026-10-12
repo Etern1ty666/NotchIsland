@@ -74,7 +74,10 @@ struct IslandView: View {
                         ClipboardTab(clip: clip, expanded: state.expanded)
                     case .stats:
                         StatsTab(stats: stats, settings: statsSettings, usage: usage,
-                                 openSettings: { openSettings(true, at: SettingsView.claudeAccount) })
+                                 openSettings: { openSettings(true, at: SettingsView.claudeAccount) },
+                                 openDetails: { item in
+                                     if let menu = state.cardMenu?(item) { state.openMenu?(menu, nil) }
+                                 })
                     }
                 }
             }
@@ -121,7 +124,7 @@ struct IslandView: View {
                 // «Держать экран включенным»: по клику — меню сроков прямо под кнопкой
                 GeometryReader { g in
                     SleepButton(slashed: awake.active, help: awake.statusText) {
-                        state.openAwakeMenu?(g.frame(in: .global))
+                        state.openMenu?(awake.makeMenu(header: true), g.frame(in: .global))
                     }
                 }
                 .frame(width: 26, height: 26)

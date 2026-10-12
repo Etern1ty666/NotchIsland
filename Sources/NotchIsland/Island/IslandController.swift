@@ -61,7 +61,7 @@ final class IslandController: NSObject {
         hitPanel.orderFrontRegardless()
         panel.orderFrontRegardless()
 
-        state.openAwakeMenu = { [weak self] r in self?.showAwakeMenu(below: r) }
+        state.openMenu = { [weak self] menu, r in self?.showMenu(menu, below: r) }
 
         NSEvent.addGlobalMonitorForEvents(matching: .mouseMoved) { [weak self] _ in
             self?.forwardMouseMove()
@@ -228,21 +228,21 @@ final class IslandController: NSObject {
         }
     }
 
-    /// Меню сроков «Держать экран включенным» под кнопкой на острове
-    func showAwakeMenu(below r: CGRect) {
+    /// Меню на острове: сроки «Держать экран включенным» — под кнопкой (r), подробности карточки — у курсора
+    func showMenu(_ menu: NSMenu, below r: CGRect?) {
         // .global у SwiftUI — от левого верхнего угла окна острова; переводим в координаты экрана.
         // Верх меню держим ниже строки меню, иначе macOS обрезает его и показывает стрелку прокрутки
-        let y = min(panel.frame.maxY - r.maxY - 6, screen.visibleFrame.maxY - 8)
-        let p = NSPoint(x: panel.frame.minX + r.minX, y: y)
+        var p = NSEvent.mouseLocation
+        if let r { p = NSPoint(x: panel.frame.minX + r.minX, y: panel.frame.maxY - r.maxY - 6) }
+        p.y = min(p.y, screen.visibleFrame.maxY - 8)
         menuOpen = true
         // открываем после того, как SwiftUI закончит обработку клика: popUp ждёт, пока меню
         // закроется, и прямо внутри действия кнопки держал бы SwiftUI посреди обновления —
         // подсветка пунктов меню от этого отставала
         DispatchQueue.main.async { [weak self] in
-            guard let self else { return }
-            self.awake.makeMenu(header: true).popUp(positioning: nil, at: p, in: nil)
-            self.menuOpen = false
-            self.mouseMoved()
+            menu.popUp(positioning: nil, at: p, in: nil)
+            self?.menuOpen = false
+            self?.mouseMoved()
         }
     }
 
