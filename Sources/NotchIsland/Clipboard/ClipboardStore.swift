@@ -35,6 +35,10 @@ final class ClipboardStore: ObservableObject {
     private let io = DispatchQueue(label: "NotchIsland.clipboard")
     private var saveWork: DispatchWorkItem?
     private var timers: [Timer] = []
+    /// Слежка за папкой со скриншотами: новый попадает в ленту, как только macOS его сохранит, — и при открытом острове
+    private var shotWatch: DispatchSourceFileSystemObject?
+    private var shotWatchDir: URL?
+    private var shotScanWork: DispatchWorkItem?
 
     init() {
         load()
@@ -128,7 +132,7 @@ final class ClipboardStore: ObservableObject {
         return p
     }
 
-    /// Новые скриншоты из папки — в ленту (при раскрытии острова). true — есть совсем свежий
+    /// Новые скриншоты из папки — в ленту (при раскрытии острова и при каждом изменении папки). true — есть совсем свежий
     @discardableResult
     func scanScreenshots() -> Bool {
         // удалённые с диска убираем и из ленты
@@ -138,10 +142,13 @@ final class ClipboardStore: ObservableObject {
         let age = retention == .forever ? 86400 : TimeInterval(retention.rawValue)
         let cutoff = Date().addingTimeInterval(-age)
         let urls: [URL]
+        let dir = Self.screenshotDir()
         do {
             urls = try FileManager.default.contentsOfDirectory(
-                at: Self.screenshotDir(), includingPropertiesForKeys: [.creationDateKey], options: .skipsHiddenFiles)
+                at: dir, includingPropertiesForKeys: [.creationDateKey], options: .skipsHiddenFiles)
             screenshotsDenied = false
+            // следим, только когда папку уже дали читать: иначе macOS спросила бы доступ сразу при запуске
+            watchScreenshots(dir)
         } catch {
             screenshotsDenied = Self.isPermissionError(error)
             urls = []
@@ -160,6 +167,42 @@ final class ClipboardStore: ObservableObject {
         }
         if seenShots.count > 200 { seenShots.removeFirst(seenShots.count - 200) }
         return items.contains { $0.kind == .screenshot && Date().timeIntervalSince($0.date) < 15 }
+    }
+
+    /// Пока на экране миниатюра скриншота, macOS держит снимок в памяти и пишет файл, только когда миниатюра
+    /// уйдёт (или её смахнут вправо). Ловим этот момент по изменению папки, а не ждём раскрытия острова.
+    /// Сменили папку для скриншотов — следим за новой
+    private func watchScreenshots(_ dir: URL) {
+        guard dir != shotWatchDir else { return }
+        shotWatch?.cancel()
+        shotWatch = nil
+        shotWatchDir = nil
+        let fd = open(dir.path, O_EVTONLY)
+        guard fd >= 0 else { return }
+        let source = DispatchSource.makeFileSystemObjectSource(fileDescriptor: fd, eventMask: [.write, .rename, .delete],
+                                                               queue: .main)
+        source.setEventHandler { [weak self, weak source] in
+            guard let self, let source else { return }
+            // саму папку переименовали или удалили — следить больше не за чем, переподключимся при скане
+            if !source.data.isDisjoint(with: [.rename, .delete]) {
+                source.cancel()
+                self.shotWatch = nil
+                self.shotWatchDir = nil
+            }
+            self.scheduleShotScan()
+        }
+        source.setCancelHandler { close(fd) }
+        source.resume()
+        shotWatch = source
+        shotWatchDir = dir
+    }
+
+    /// macOS пишет скриншот скрытым файлом и тут же переименовывает — событий пачка, сканируем раз на пачку
+    private func scheduleShotScan() {
+        shotScanWork?.cancel()
+        let work = DispatchWorkItem { [weak self] in self?.scanScreenshots() }
+        shotScanWork = work
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.15, execute: work)
     }
 
     // MARK: Доступ к папке со скриншотами

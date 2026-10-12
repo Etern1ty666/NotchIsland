@@ -64,6 +64,7 @@ final class IslandController: NSObject {
         state.openAwakeMenu = { [weak self] r in self?.showAwakeMenu(below: r) }
 
         NSEvent.addGlobalMonitorForEvents(matching: .mouseMoved) { [weak self] _ in
+            self?.forwardMouseMove()
             self?.scheduleMouseMoved()
         }
         NSEvent.addLocalMonitorForEvents(matching: .mouseMoved) { [weak self] e in
@@ -191,6 +192,31 @@ final class IslandController: NSObject {
         } else {
             cancelExpand()
         }
+    }
+
+    /// macOS отдаёт движения мыши то острову, то активному приложению под ним — вразнобой, хотя остров
+    /// сверху: окну, которое никогда не становится активным, они достаются ненадёжно. Тогда SwiftUI не узнаёт,
+    /// что курсор переехал, и подсветка залипает на прежней плитке, а под курсором не появляется.
+    /// Движение, доставшееся другому приложению, над раскрытым островом передаём острову сами.
+    /// С меню «не засыпать» то же самое: подсветка пункта под курсором залипала — его отслеживание
+    /// берёт события из очереди приложения, туда и кладём
+    private func forwardMouseMove() {
+        let p = NSEvent.mouseLocation
+        if menuOpen {
+            if let e = NSEvent.mouseEvent(with: .mouseMoved, location: p, modifierFlags: [],
+                                          timestamp: ProcessInfo.processInfo.systemUptime, windowNumber: 0,
+                                          context: nil, eventNumber: 0, clickCount: 0, pressure: 0) {
+                NSApp.postEvent(e, atStart: false)
+            }
+            return
+        }
+        guard state.expanded, let host = panel.contentView, panel.frame.contains(p),
+              let e = NSEvent.mouseEvent(with: .mouseMoved, location: panel.convertPoint(fromScreen: p),
+                                         modifierFlags: [], timestamp: ProcessInfo.processInfo.systemUptime,
+                                         windowNumber: panel.windowNumber, context: nil,
+                                         eventNumber: 0, clickCount: 0, pressure: 0)
+        else { return }
+        host.mouseMoved(with: e)
     }
 
     private func scheduleMouseMoved() {
