@@ -36,11 +36,10 @@ func formatMinutes(_ m: Int) -> String {
     return m < 60 ? "\(m) \(min)" : "\(m / 60) \(hour)" + (m % 60 > 0 ? " \(m % 60) \(min)" : "")
 }
 
-/// Сколько прошло: «сейчас», «40 с», «5 мин», «2 ч», «3 д»
-func relativeTime(_ d: Date) -> String {
-    let s = Int(Date().timeIntervalSince(d))
-    if s < 10 { return L("сейчас") }
-    if s < 60 { return "\(s) \(L("с"))" }
+/// Сколько прошло: «сейчас» (меньше минуты), «5 мин», «2 ч», «3 д»
+func relativeTime(_ d: Date, now: Date = Date()) -> String {
+    let s = Int(now.timeIntervalSince(d))
+    if s < 60 { return L("сейчас") }
     if s < 3600 { return "\(s / 60) \(L("мин"))" }
     if s < 86400 { return "\(s / 3600) \(L("ч"))" }
     return "\(s / 86400) \(L("д"))"

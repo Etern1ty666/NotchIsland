@@ -16,9 +16,9 @@ final class IslandState: ObservableObject {
     @Published var showSettings = false
     /// К какой строке прокрутить открывшиеся настройки (например, `SettingsView.claudeAccount`); nil — с начала
     @Published var settingsAnchor: String?
-    /// После установки и каждого обновления вокруг выреза пульсирует зелёное свечение — «курсор сюда».
-    /// Гаснет, когда остров раскроют
-    @Published var showHint = UserDefaults.standard.string(forKey: DefaultsKey.islandHintVersion) != Updater.currentVersion
+    /// Новому пользователю вокруг выреза пульсирует зелёное свечение — «курсор сюда».
+    /// Гаснет навсегда, когда остров раскроют впервые; после обновлений не появляется
+    @Published var showHint = UserDefaults.standard.string(forKey: DefaultsKey.islandHintVersion) == nil
     /// Есть обновление или оно ставится — внизу острова полоса с кнопкой и прогрессом
     @Published var updateBar = false
     /// Показать меню под кнопкой (её рамка в координатах острова) или, без рамки, у курсора

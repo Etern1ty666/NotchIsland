@@ -9,6 +9,8 @@ struct ClipboardTab: View {
     let expanded: Bool
 
     @State private var copiedKey: String?
+    /// Время на записях («5 мин»): пересчитываем при раскрытии и раз в 15 с, пока остров открыт
+    @State private var now = Date()
 
     var body: some View {
         Group {
@@ -41,6 +43,13 @@ struct ClipboardTab: View {
         .onChange(of: expanded) { open in
             if open { copiedKey = nil }
         }
+        .task(id: expanded) {
+            guard expanded else { return }
+            while !Task.isCancelled {
+                now = Date()
+                try? await Task.sleep(nanoseconds: 15_000_000_000)
+            }
+        }
     }
 
     /// Пусто и подсказки спрятаны — одна строка, чтобы остров не казался сломанным
@@ -67,6 +76,7 @@ struct ClipboardTab: View {
             ForEach(items) { item in
                 ClipCard(item: item,
                          copied: copiedKey == item.id.uuidString,
+                         now: now,
                          onCopy: {
                              clip.copy(item)
                              markCopied(item.id.uuidString)

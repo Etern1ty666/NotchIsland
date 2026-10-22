@@ -89,6 +89,8 @@ struct ClipCard: View {
 
     let item: ClipItem
     let copied: Bool
+    /// Сейчас — от него «5 мин» на записи; меняется, пока остров открыт
+    let now: Date
     let onCopy: () -> Void
     let onDelete: () -> Void
     let onDrag: () -> NSItemProvider
@@ -135,7 +137,7 @@ struct ClipCard: View {
 
     /// Когда скопировали
     var timeLabel: some View {
-        Text(relativeTime(item.date)).font(.system(size: 10).monospacedDigit()).fixedSize()
+        Text(relativeTime(item.date, now: now)).font(.system(size: 10).monospacedDigit()).fixedSize()
     }
 
     // Текст, ссылка или файлы
@@ -198,6 +200,32 @@ struct ClipCard: View {
         copied ? Color(red: 0.04, green: 0.16, blue: 0.07) : Color(white: hover ? 0.14 : 0.07)
     }
 
+    /// «✓ Скопировано» поверх картинки — на тёмной подложке, чтобы читалось и на светлом снимке.
+    /// Узкой карточке не хватает ширины на строку — значок над словом
+    var copiedBadge: some View {
+        let icon = Image(systemName: "checkmark.circle.fill")
+        let text = Text(L("Скопировано")).lineLimit(1)
+        return ViewThatFits(in: .horizontal) {
+            HStack(spacing: 4) {
+                icon.font(.system(size: 12, weight: .semibold))
+                text.font(.system(size: 11, weight: .semibold))
+            }
+            .padding(.horizontal, 8)
+            .frame(height: 22)
+            .background(Capsule().fill(Color.black.opacity(0.75)))
+            // узкая — затемнена сильнее целиком: ширина вся под слово
+            VStack(spacing: 4) {
+                icon.font(.system(size: 18, weight: .semibold))
+                // сжатое начертание: «Скопировано» помещается в самую узкую карточку без мелкого кегля
+                text.font(.system(size: 10, weight: .semibold).width(.condensed)).minimumScaleFactor(0.8)
+            }
+            .padding(.horizontal, 2)
+            .frame(maxWidth: .infinity, maxHeight: .infinity)
+            .background(Color.black.opacity(0.4))
+        }
+        .foregroundStyle(Color.green)
+    }
+
     // Картинка, скриншот или файл-картинка
     func visual(_ url: URL) -> some View {
         let width = min(max(Self.visualHeight * Thumb.aspect(url), Self.visualWidth.lowerBound),
@@ -212,7 +240,7 @@ struct ClipCard: View {
                     .padding(.vertical, 2)
                     .background(Capsule().fill(Color.black.opacity(0.6)))
                     .padding(5)
-                    .opacity(showActions && width < 150 ? 0 : 1)
+                    .opacity(copied || (showActions && width < 150) ? 0 : 1)
             }
             .overlay(alignment: .bottomTrailing) {
                 actions(onImage: true).padding(5)
@@ -220,9 +248,8 @@ struct ClipCard: View {
             .overlay {
                 if copied {
                     ZStack {
-                        Color.black.opacity(0.55)
-                        Image(systemName: "checkmark.circle.fill").font(.system(size: 22))
-                            .foregroundStyle(Color.green)
+                        Color.black.opacity(0.45)
+                        copiedBadge
                     }
                 }
             }
