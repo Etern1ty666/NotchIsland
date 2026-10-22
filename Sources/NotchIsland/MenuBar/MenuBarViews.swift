@@ -121,7 +121,7 @@ struct MenuBarStat: View {
         let b = stats.battery
         return HStack(spacing: 5) {
             BatteryGlyph(level: b?.level ?? 0, charging: b?.charging ?? false, color: stats.color(.battery), ink: ink)
-                .frame(width: 36, height: 16)
+                .frame(height: 16)
             if let b {
                 if b.state == .charging || b.state == .battery {
                     if let m = b.minutes {
@@ -140,7 +140,9 @@ struct MenuBarStat: View {
 }
 
 /// Батарейка без рамки: полупрозрачный корпус, ярче — заряд (цвета `ink`; зелёный при зарядке, жёлтый
-/// и красный при низком заряде), проценты прямо на ней — контрастные, одним цветом: читаются на любой части
+/// и красный при низком заряде), проценты прямо на ней — контрастные, одним цветом: читаются на любой части.
+/// Корпус постоянной ширины; шире — только когда подпись в него не влезает (молния и «100» при дозарядке),
+/// чтобы цифры не обрезались «…»
 struct BatteryGlyph: View {
     let level: Double
     let charging: Bool
@@ -149,19 +151,26 @@ struct BatteryGlyph: View {
     /// Основной цвет: белая батарейка на тёмной строке меню, чёрная — на светлой
     var ink = Color.white
     var light: Bool { ink == .white }
+    /// Обычная ширина корпуса, без контакта справа
+    static let bodyWidth: CGFloat = 32.5
 
     var body: some View {
         let shape = RoundedRectangle(cornerRadius: 4, style: .continuous)
         HStack(spacing: 1.5) {
-            GeometryReader { g in
-                ZStack(alignment: .leading) {
-                    shape.fill(ink.opacity(0.5))
-                    Rectangle().fill(fillColor)
-                        .frame(width: g.size.width * CGFloat(min(max(level, 0), 1)))
-                    label.foregroundStyle((light ? Color.black : Color.white).opacity(0.85))
+            label
+                .foregroundStyle((light ? Color.black : Color.white).opacity(0.85))
+                .padding(.horizontal, 2)
+                .frame(minWidth: Self.bodyWidth, maxHeight: .infinity)
+                .background {
+                    GeometryReader { g in
+                        ZStack(alignment: .leading) {
+                            shape.fill(ink.opacity(0.5))
+                            Rectangle().fill(fillColor)
+                                .frame(width: g.size.width * CGFloat(min(max(level, 0), 1)))
+                        }
+                    }
                 }
                 .clipShape(shape)
-            }
             RoundedRectangle(cornerRadius: 1, style: .continuous)
                 .fill(ink.opacity(0.5))
                 .frame(width: 2, height: 5)
@@ -174,12 +183,13 @@ struct BatteryGlyph: View {
     }
 
     var label: some View {
-        HStack(spacing: 0.5) {
+        // у молнии свои поля по бокам — к цифрам вплотную
+        HStack(spacing: -0.5) {
             if charging { Image(systemName: "bolt.fill").font(.system(size: 8, weight: .black)) }
             Text("\(Int((level * 100).rounded()))")
                 .font(.system(size: 11, weight: .heavy, design: .rounded).monospacedDigit())
         }
-        .frame(maxWidth: .infinity, maxHeight: .infinity)
+        .fixedSize()
     }
 }
 

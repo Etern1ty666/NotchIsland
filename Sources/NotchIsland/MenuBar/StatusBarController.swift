@@ -24,6 +24,8 @@ final class StatusBarController: NSObject, NSMenuDelegate {
     private var shown: [String] = []
     /// Вид «таблетки» Claude («подключите», «без данных», «с цифрами») — при смене ширина задаётся заново
     private var claudeLooks: [ClaudeWidget: String] = [:]
+    /// Вид значка батареи (`batteryLook`) — при смене ширина задаётся заново
+    private var batteryLook: String?
     var bag = Set<AnyCancellable>()
     /// Чьё это меню — по нему menuNeedsUpdate решает, что показать
     var menuKinds: [ObjectIdentifier: MenuKind] = [:]
@@ -177,6 +179,7 @@ final class StatusBarController: NSObject, NSMenuDelegate {
         appItem = nil
         menuKinds = [:]
         claudeLooks = [:]
+        batteryLook = nil
         for (i, name) in wanted.enumerated() {
             let slot = "item.\(i)"
             if name == "awake.right" {
@@ -273,12 +276,30 @@ final class StatusBarController: NSObject, NSMenuDelegate {
 
     func statsDidUpdate() {
         for (s, item) in statItems where item.isVisible {
-            let w = ceil(measure(s) + 2)
-            if w > item.length { item.length = w }
+            if s == .battery, Self.batteryLook(stats.battery) != batteryLook {
+                // сменился вид — ширина по новому содержимому, в том числе меньше прежней
+                batteryLook = Self.batteryLook(stats.battery)
+                item.length = ceil(measure(s) + reserve(s))
+            } else {
+                let w = ceil(measure(s) + 2)
+                if w > item.length { item.length = w }
+            }
             item.button?.toolTip = stats.summary(s)
         }
         // подстраховка: копии, появившиеся без уведомления, — на следующем замере
         dimReplicas()
+    }
+
+    /// Вид значка батареи — что справа от батарейки (как в `MenuBarStat.battery`): вилка, ничего или
+    /// время, а у времени — первое число с единицей: «8м», «88м», «8ч», «88ч», «8д». В пределах вида ширина
+    /// только растёт («1ч 5м» → «1ч 10м» не двигает соседей), а при смене — по содержимому: иначе после
+    /// «1ч 5м» батарейка с вилкой стоит посреди пустого места
+    private static func batteryLook(_ b: BatteryInfo?) -> String {
+        guard let b else { return "none" }
+        guard b.state == .charging || b.state == .battery else { return "plug" }
+        guard let m = b.minutes else { return "none" }
+        let first = shortDuration(minutes: m).prefix { $0 != " " }
+        return "time." + String(first.map { $0.isNumber ? "8" : $0 })
     }
 
     /// Иконка-тумблер для строки меню: белая «таблетка» с вырезом-ручкой справа.
