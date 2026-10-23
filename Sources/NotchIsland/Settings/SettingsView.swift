@@ -1,7 +1,7 @@
 import SwiftUI
 import AppKit
 
-/// Настройки (шестерёнка справа от zzz): буфер, строка меню, экран, Claude, приложение.
+/// Настройки (шестерёнка справа от zzz): приложение, экран, строка меню, буфер, Claude.
 /// Целиком в остров не помещаются — прокручиваются
 struct SettingsView: View {
     @ObservedObject var usage: ClaudeUsage
@@ -24,7 +24,35 @@ struct SettingsView: View {
     var body: some View {
         FadingScrollView(scrollTo: anchor) {
             VStack(alignment: .leading, spacing: 8) {
-                SectionHeader(icon: "list.clipboard", title: "Буфер обмена")
+                SectionHeader(icon: "macwindow", title: "Приложение")
+                SettingsRow(icon: "power", title: "Запускать при входе",
+                            help: loginItem.available ? nil : "Работает, когда приложение лежит в «Программах»") {
+                    SegmentPicker(options: [(false, "Выкл"), (true, "Вкл")],
+                                  selection: Binding(get: { loginItem.enabled }, set: { loginItem.set($0) }))
+                        .disabled(!loginItem.available)
+                        .opacity(loginItem.available ? 1 : 0.5)
+                }
+                SettingsRow(icon: "arrow.down.circle", title: L("Версия %@", Updater.currentVersion)) {
+                    HStack(spacing: 8) {
+                        PillButton(title: "Что нового", action: openWhatsNew)
+                        UpdateStatus(updater: updater)
+                    }
+                }
+
+                section("Экран", icon: "display")
+                SettingsRow(icon: "zzz", iconColor: awake.active ? Theme.awake : Color.white.opacity(0.5),
+                            title: KeepAwake.title, help: awake.active ? awake.statusText : nil) {
+                    SegmentPicker(options: awakeOptions, selection: awakeSelection)
+                }
+
+                section("Строка меню", icon: "menubar.rectangle")
+                menuBarItems
+                SettingsRow(icon: "capsule", title: "Подложка",
+                            help: "Тёмная подложка под значками. Без неё значки подстраиваются под цвет строки меню") {
+                    SegmentPicker(options: [(false, "Выкл"), (true, "Вкл")], selection: $statsSettings.menuPill)
+                }
+
+                section("Буфер обмена", icon: "list.clipboard")
                 SettingsRow(icon: "clock.arrow.circlepath", title: "Хранить историю") {
                     SegmentPicker(options: ClipRetention.allCases.map { ($0, $0.title) }, selection: $clip.retention)
                 }
@@ -42,40 +70,12 @@ struct SettingsView: View {
                     }
                 }
 
-                section("Строка меню", icon: "menubar.rectangle")
-                menuBarItems
-                SettingsRow(icon: "capsule", title: "Подложка",
-                            help: "Тёмная подложка под значками. Без неё значки подстраиваются под цвет строки меню") {
-                    SegmentPicker(options: [(false, "Выкл"), (true, "Вкл")], selection: $statsSettings.menuPill)
-                }
-
-                section("Экран", icon: "display")
-                SettingsRow(icon: "zzz", iconColor: awake.active ? Theme.awake : Color.white.opacity(0.5),
-                            title: KeepAwake.title, help: awake.active ? awake.statusText : nil) {
-                    SegmentPicker(options: awakeOptions, selection: awakeSelection)
-                }
-
                 section("Claude", icon: "sparkles")
                 // вход Claude Code: лимиты обновляются сами и учитывают и приложение, и браузер
                 SettingsRow(icon: loginIcon, iconColor: loginColor, title: "Аккаунт Claude", help: loginStatus) {
                     loginButtons
                 }
                 .id(Self.claudeAccount)
-
-                section("Приложение", icon: "macwindow")
-                SettingsRow(icon: "power", title: "Запускать при входе",
-                            help: loginItem.available ? nil : "Работает, когда приложение лежит в «Программах»") {
-                    SegmentPicker(options: [(false, "Выкл"), (true, "Вкл")],
-                                  selection: Binding(get: { loginItem.enabled }, set: { loginItem.set($0) }))
-                        .disabled(!loginItem.available)
-                        .opacity(loginItem.available ? 1 : 0.5)
-                }
-                SettingsRow(icon: "arrow.down.circle", title: L("Версия %@", Updater.currentVersion)) {
-                    HStack(spacing: 8) {
-                        PillButton(title: "Что нового", action: openWhatsNew)
-                        UpdateStatus(updater: updater)
-                    }
-                }
             }
         }
         .onAppear { loginItem.refresh() }

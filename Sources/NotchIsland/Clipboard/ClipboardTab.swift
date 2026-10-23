@@ -140,7 +140,6 @@ struct SelectionCount: View {
             .padding(.horizontal, 14)
             .frame(height: 28)
             .background(Capsule().fill(Color(white: 0.17)))
-            .overlay(Capsule().strokeBorder(Theme.selection.opacity(0.6), lineWidth: 1))
             .shadow(color: .black.opacity(0.5), radius: 8, y: 2)
     }
 

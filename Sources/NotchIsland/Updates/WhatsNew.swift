@@ -23,20 +23,22 @@ enum WhatsNew {
 
     static let accent = Color(red: 0.62, green: 0.66, blue: 1)
 
+    /// Свежие изменения, какие есть у этой версии: у исправлений вроде 1.29.1 своих нет — показываем 1.29
+    static var latest: Release? {
+        releases.first { !isNewer($0.version, than: Updater.currentVersion) }
+    }
+
     /// При запуске: обновились ли с прошлого раза и есть ли что рассказать. Новому пользователю — нет:
     /// запоминаем текущую версию как уже виденную
     static func checkOnLaunch() -> Bool {
         let d = UserDefaults.standard
-        let current = Updater.currentVersion
         guard let seen = d.string(forKey: DefaultsKey.whatsNewSeen) else {
             // до 1.29 виденную версию не запоминали. Остров уже раскрывали — значит, это обновление, а не установка
-            if d.string(forKey: DefaultsKey.islandHintVersion) != nil {
-                return releases.contains { $0.version == current }
-            }
+            if d.string(forKey: DefaultsKey.islandHintVersion) != nil { return latest != nil }
             markSeen()
             return false
         }
-        return releases.contains { isNewer($0.version, than: seen) && !isNewer($0.version, than: current) }
+        return latest.map { isNewer($0.version, than: seen) } ?? false
     }
 
     static func markSeen() {
@@ -65,7 +67,7 @@ struct WhatsNewBar: View {
 
     var body: some View {
         HStack(spacing: 6) {
-            GreenButton(icon: "sparkles", title: L("Что нового в версии %@", Updater.currentVersion),
+            GreenButton(icon: "sparkles", title: L("Что нового в версии %@", WhatsNew.latest?.version ?? Updater.currentVersion),
                         help: "Что изменилось в этой версии", color: WhatsNew.accent, action: open)
             CircleIconButton(systemName: "xmark", help: "Спрятать", action: close)
         }
