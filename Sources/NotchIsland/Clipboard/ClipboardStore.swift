@@ -17,7 +17,10 @@ final class ClipboardStore: ObservableObject {
     private static let file = dir.appendingPathComponent("history.json")
 
     /// Все записи, новые сверху
-    @Published private(set) var items: [ClipItem] = []
+    @Published private(set) var items: [ClipItem] = [] {
+        // удалённые (крестиком, по сроку хранения) выпадают и из выбора
+        didSet { if !selection.isEmpty { selection.removeAll { id in !items.contains { $0.id == id } } } }
+    }
     /// macOS не даёт читать папку со скриншотами (в окне доступа нажали «Не разрешать»)
     @Published private(set) var screenshotsDenied = false
     @Published var retention = ClipRetention(rawValue: UserDefaults.standard.object(forKey: DefaultsKey.clipRetention) as? Int
@@ -40,6 +43,12 @@ final class ClipboardStore: ObservableObject {
         let all: Bool
     }
     @Published private(set) var deletion: Deletion?
+    /// Выбранные ⌘-кликом на острове — в порядке выбора: так они и скопируются вместе.
+    /// Снимается Esc, обычным кликом и при сворачивании острова
+    @Published var selection: [UUID] = []
+    /// Только что скопированные с острова — на них «Скопировано»; гаснет само
+    @Published private(set) var copied: Set<UUID> = []
+    private var copiedWork: DispatchWorkItem?
     /// Сколько держится «Вернуть»; потом копии картинок стираются с диска
     static let undoTime: TimeInterval = 5
     private var deletionWork: DispatchWorkItem?
@@ -296,6 +305,70 @@ final class ClipboardStore: ObservableObject {
         case .files: pb.writeObjects(item.urls as [NSURL])
         }
         lastCount = pb.changeCount
+        markCopied([item.id])
+    }
+
+    /// Несколько записей разом, в порядке выбора. Одни тексты — одним текстом, каждый с новой строки;
+    /// иначе каждая запись — отдельным элементом буфера: текст текстом, картинки, скриншоты и файлы — файлами.
+    /// Файлами Finder, почта и мессенджеры вставляют всё сразу, а картинками — часто только первую
+    func copy(_ list: [ClipItem]) {
+        guard list.count > 1 else {
+            if let item = list.first { copy(item) }
+            return
+        }
+        let pb = NSPasteboard.general
+        pb.clearContents()
+        if list.allSatisfy({ $0.kind == .text }) {
+            pb.setString(list.map(\.text).joined(separator: "\n"), forType: .string)
+        } else {
+            pb.writeObjects(list.flatMap { item -> [NSPasteboardWriting] in
+                item.kind == .text ? [item.text as NSString] : item.urls.map { $0 as NSURL }
+            })
+        }
+        lastCount = pb.changeCount
+        markCopied(list.map(\.id))
+    }
+
+    /// Остров после копирования не сворачивается — «Скопировано» на записях гаснет само
+    private func markCopied(_ ids: [UUID]) {
+        copiedWork?.cancel()
+        copied = Set(ids)
+        let work = DispatchWorkItem { [weak self] in self?.copied = [] }
+        copiedWork = work
+        DispatchQueue.main.asyncAfter(deadline: .now() + 1.2, execute: work)
+    }
+
+    /// Остров раскрыли заново — прежних «Скопировано» уже нет
+    func clearCopiedMarks() {
+        copiedWork?.cancel()
+        copiedWork = nil
+        if !copied.isEmpty { copied = [] }
+    }
+
+    // MARK: Выбор нескольких записей (⌘-клик)
+
+    var selectedItems: [ClipItem] {
+        selection.compactMap { id in items.first { $0.id == id } }
+    }
+
+    /// ⌘-клик: добавить запись к выбору или убрать из него
+    func toggleSelection(_ item: ClipItem) {
+        if let i = selection.firstIndex(of: item.id) { selection.remove(at: i) } else { selection.append(item.id) }
+    }
+
+    func clearSelection() {
+        if !selection.isEmpty { selection = [] }
+    }
+
+    /// Выбранные — в буфер вместе; выбор снимается, на записях загорается «Скопировано»
+    func copySelection() {
+        copy(selectedItems)
+        clearSelection()
+    }
+
+    /// Выбранные — из истории, одной плашкой «Вернуть»; из выбора они выпадают сами
+    func deleteSelection() {
+        delete(selectedItems)
     }
 
     /// Что отдать при перетаскивании записи в другое окно

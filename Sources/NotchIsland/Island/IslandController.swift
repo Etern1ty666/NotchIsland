@@ -1,5 +1,6 @@
 import SwiftUI
 import AppKit
+import Combine
 
 @MainActor
 final class IslandController: NSObject {
@@ -8,6 +9,9 @@ final class IslandController: NSObject {
     let awake = KeepAwake()
     let panel: IslandPanel
     let hitPanel: HitPanel
+    /// Ловит клавиши, пока в буфере выбраны записи (см. `listenKeys`)
+    let keyPanel: KeyPanel
+    private var selectionWatch: AnyCancellable?
     private(set) var screen: NSScreen
     private var expandWork: DispatchWorkItem?
     private var collapseWork: DispatchWorkItem?
@@ -24,10 +28,12 @@ final class IslandController: NSObject {
                             backing: .buffered, defer: false)
         hitPanel = HitPanel(contentRect: .zero, styleMask: [.borderless, .nonactivatingPanel],
                             backing: .buffered, defer: false)
+        keyPanel = KeyPanel(contentRect: NSRect(x: 0, y: 0, width: 1, height: 1),
+                            styleMask: [.borderless, .nonactivatingPanel], backing: .buffered, defer: true)
         super.init()
         state.notch = Self.notchSize(on: screen)
 
-        for p in [panel, hitPanel] as [NSPanel] {
+        for p in [panel, hitPanel, keyPanel] as [NSPanel] {
             p.isFloatingPanel = true
             p.level = NSWindow.Level(rawValue: NSWindow.Level.mainMenu.rawValue + 1)
             p.collectionBehavior = [.canJoinAllSpaces, .fullScreenAuxiliary, .stationary, .ignoresCycle]
@@ -53,6 +59,13 @@ final class IslandController: NSObject {
         hit.onClick = { [weak self] in self?.expand() }
         hit.onHover = { [weak self] in self?.mouseMoved() }
         hitPanel.contentView = hit
+
+        let keys = KeyCatcher()
+        keys.onKey = { [weak self] e in self?.handleKey(e) }
+        keyPanel.contentView = keys
+        keyPanel.ignoresMouseEvents = true
+        selectionWatch = clip.$selection.map { !$0.isEmpty }.removeDuplicates()
+            .sink { [weak self] on in self?.listenKeys(on) }
 
         // Окно всегда размера раскрытого острова (плюс запас под тень), меняется только форма внутри (SwiftUI)
         panel.ignoresMouseEvents = true
@@ -246,6 +259,29 @@ final class IslandController: NSObject {
         }
     }
 
+    // MARK: Клавиши при выборе
+
+    /// Выбрали записи — невидимое окно в вырезе (там его не видно) берёт фокус клавиатуры, не активируя приложение.
+    /// Выбор сняли — окно уходит, и macOS сама возвращает фокус в окно, где работали
+    private func listenKeys(_ on: Bool) {
+        guard on && state.expanded else { return keyPanel.orderOut(nil) }
+        keyPanel.setFrameOrigin(NSPoint(x: screen.frame.midX, y: screen.frame.maxY - 2))
+        keyPanel.makeKeyAndOrderFront(nil)
+        keyPanel.makeFirstResponder(keyPanel.contentView)
+    }
+
+    /// Esc — снять выбор, ⌘C — скопировать выбранные вместе, ⌫ (и ⌦, и ⌘⌫ как в Finder) — удалить.
+    /// Коды клавиш, а не буквы: ⌘C работает и на русской раскладке
+    private func handleKey(_ e: NSEvent) {
+        guard state.expanded, !clip.selection.isEmpty else { return }
+        switch e.keyCode {
+        case 53: clip.clearSelection()
+        case 8 where e.modifierFlags.contains(.command): clip.copySelection()
+        case 51, 117: withAnimation(.easeOut(duration: 0.2)) { clip.deleteSelection() }
+        default: break
+        }
+    }
+
     func cancelExpand() {
         expandWork?.cancel()
         expandWork = nil
@@ -289,6 +325,7 @@ final class IslandController: NSObject {
         collapseWork = nil
         guard state.expanded else { return }
         state.expanded = false
+        clip.clearSelection()
         panel.ignoresMouseEvents = true
         hitPanel.ignoresMouseEvents = false
         // при следующем раскрытии — снова вкладки; меняем, когда содержимое уже погасло

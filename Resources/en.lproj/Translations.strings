@@ -39,7 +39,7 @@
 "Всегда" = "Always";
 "Всё скопированное — текст, ссылки, картинки и файлы — появляется здесь" = "Everything copied — text, links, images and files — shows up here";
 "Свежие скриншоты (⇧⌘3, ⇧⌘4) тоже попадают сюда" = "New screenshots (⇧⌘3, ⇧⌘4) land here too";
-"Клик по записи копирует её снова, записи можно перетаскивать в другие окна" = "Clicking an item copies it again; items can be dragged into other windows";
+"Клик по записи копирует её снова, ⌘-клик — выбирает несколько. Записи можно перетаскивать в другие окна" = "Clicking an item copies it again, ⌘-click selects several. Items can be dragged into other windows";
 "История сохраняется после перезагрузки, срок хранения — в настройках" = "History survives restarts; how long it’s kept is in Settings";
 "Подсказки" = "Tips";
 "Рабочий стол" = "Desktop";
@@ -104,6 +104,12 @@
 "Запись удалена" = "Item removed";
 "История очищена" = "History cleared";
 "Вернуть" = "Undo";
+"Удалено: %@" = "Removed: %@";
+"Выбрано: %@" = "Selected: %@";
+"Скопировать" = "Copy";
+"Скопировать вместе, по порядку номеров (⌘C)" = "Copy together, in numbered order (⌘C)";
+"Удалить выбранные (⌫)" = "Remove selected (⌫)";
+"Снять выбор (Esc)" = "Deselect (Esc)";
 "Здесь появится всё скопированное" = "Everything you copy will appear here";
 "Вернуть подсказки можно в настройках" = "You can bring tips back in Settings";
 "Карточки с подсказками под записями буфера" = "Tip cards below clipboard items";

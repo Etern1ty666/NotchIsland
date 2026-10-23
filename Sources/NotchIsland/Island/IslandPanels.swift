@@ -52,3 +52,27 @@ final class HitView: NSView {
     override func mouseMoved(with event: NSEvent) { onHover?() }
     override func mouseExited(with event: NSEvent) { onHover?() }
 }
+
+/// Невидимое окно-«уши» острова: пока в буфере выбраны записи, принимает фокус клавиатуры (Esc, ⌘C, ⌫),
+/// не делая приложение активным. Сам остров фокус не берёт никогда — выбор сняли, окно убирается,
+/// и фокус возвращается туда, где работали
+final class KeyPanel: NSPanel {
+    override var canBecomeKey: Bool { true }
+    override var canBecomeMain: Bool { false }
+    override func constrainFrameRect(_ frameRect: NSRect, to screen: NSScreen?) -> NSRect { frameRect }
+}
+
+final class KeyCatcher: NSView {
+    var onKey: ((NSEvent) -> Void)?
+
+    override var acceptsFirstResponder: Bool { true }
+    // всё, что не наше, глотаем молча — без системного «бума»
+    override func keyDown(with event: NSEvent) { onKey?(event) }
+    /// Сочетания с ⌘ сюда приходят раньше keyDown. Чужие (⌘Q и прочие команды приложения) тоже глотаем:
+    /// фокус у острова ненадолго и случайно, остров от них закрываться не должен
+    override func performKeyEquivalent(with event: NSEvent) -> Bool {
+        guard event.modifierFlags.contains(.command) else { return false }
+        onKey?(event)
+        return true
+    }
+}

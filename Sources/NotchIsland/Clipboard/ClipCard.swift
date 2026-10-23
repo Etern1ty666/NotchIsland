@@ -78,7 +78,7 @@ struct ClipActionButton: View {
     }
 }
 
-/// Запись буфера. Клик — скопировать, перетаскивание — в другое окно;
+/// Запись буфера. Клик — скопировать, ⌘-клик — выбрать (синяя рамка и номер), перетаскивание — в другое окно;
 /// при наведении вместо времени — «показать в Finder» и крестик.
 /// Размер — по содержимому: текст не шире, чем нужно (длинный переносится), снимок — по своей форме
 struct ClipCard: View {
@@ -89,9 +89,12 @@ struct ClipCard: View {
 
     let item: ClipItem
     let copied: Bool
+    /// Место в выборе (⌘-клик), с единицы: в таком порядке выбранные и скопируются. nil — не выбрана
+    let selection: Int?
     /// Сейчас — от него «5 мин» на записи; меняется, пока остров открыт
     let now: Date
-    let onCopy: () -> Void
+    /// Клик: скопировать или, с ⌘, выбрать — решает вкладка
+    let onTap: () -> Void
     let onDelete: () -> Void
     let onDrag: () -> NSItemProvider
     @State private var hover = false
@@ -102,13 +105,37 @@ struct ClipCard: View {
             if let url = item.imageURL { visual(url) } else { plain }
         }
         .clipShape(shape)
-        .overlay(shape.strokeBorder(Color.white.opacity(item.isVisual && hover ? 0.45 : 0), lineWidth: 1))
+        .overlay {
+            if selected {
+                // на картинке рамку отделяет от снимка тёмная линия: иначе на синем она теряется
+                ZStack {
+                    if item.isVisual { shape.inset(by: 2).strokeBorder(Color.black.opacity(0.7), lineWidth: 1.5) }
+                    shape.strokeBorder(Theme.selection, lineWidth: 2)
+                }
+            } else {
+                shape.strokeBorder(Color.white.opacity(item.isVisual && hover ? 0.45 : 0), lineWidth: 1)
+            }
+        }
         .contentShape(shape)
         .onHover { hover = $0 }
-        .onTapGesture(perform: onCopy)
+        .onTapGesture(perform: onTap)
         .onDrag(onDrag)
         .help(helpText)
         .animation(.easeOut(duration: 0.12), value: hover)
+        .animation(.easeOut(duration: 0.12), value: selection)
+    }
+
+    var selected: Bool { selection != nil && !copied }
+
+    /// Номер в выборе — белым на синем кружке
+    func selectionBadge(_ n: Int) -> some View {
+        Text("\(n)")
+            .font(.system(size: 11, weight: .bold, design: .rounded).monospacedDigit())
+            .foregroundStyle(Color.white)
+            .padding(.horizontal, n > 9 ? 4 : 0)
+            .frame(minWidth: 18, minHeight: 18)
+            .background(Capsule().fill(Theme.selection))
+            .fixedSize()
     }
 
     var helpText: String {
@@ -161,9 +188,13 @@ struct ClipCard: View {
                         .foregroundStyle(Color.white.opacity(0.45))
                 }
             }
+            // номер встаёт на место времени: ширина карточки не меняется, соседи не прыгают
             timeLabel
                 .foregroundStyle(Color.white.opacity(0.4))
-                .opacity(hover || copied ? 0 : 1)
+                .opacity(hover || copied || selected ? 0 : 1)
+                .overlay(alignment: .trailing) {
+                    if let selection, selected { selectionBadge(selection).opacity(hover ? 0 : 1) }
+                }
         }
         .padding(.leading, 10)
         .padding(.trailing, 8)
@@ -197,7 +228,9 @@ struct ClipCard: View {
 
     /// Непрозрачный цвет карточки (остров чёрный): им же подложены кнопки поверх текста
     var cardColor: Color {
-        copied ? Color(red: 0.04, green: 0.16, blue: 0.07) : Color(white: hover ? 0.14 : 0.07)
+        if copied { return Color(red: 0.04, green: 0.16, blue: 0.07) }
+        if selected { return hover ? Color(red: 0.09, green: 0.2, blue: 0.36) : Color(red: 0.06, green: 0.15, blue: 0.29) }
+        return Color(white: hover ? 0.14 : 0.07)
     }
 
     /// «✓ Скопировано» поверх картинки — на тёмной подложке, чтобы читалось и на светлом снимке.
@@ -244,6 +277,9 @@ struct ClipCard: View {
             }
             .overlay(alignment: .bottomTrailing) {
                 actions(onImage: true).padding(5)
+            }
+            .overlay(alignment: .topLeading) {
+                if let selection, selected { selectionBadge(selection).padding(5) }
             }
             .overlay {
                 if copied {
