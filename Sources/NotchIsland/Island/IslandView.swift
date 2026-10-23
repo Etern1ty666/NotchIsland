@@ -67,7 +67,10 @@ struct IslandView: View {
             Group {
                 if state.showSettings {
                     SettingsView(usage: usage, clip: clip, stats: stats, statsSettings: statsSettings,
-                                 awake: awake, updater: updater, anchor: state.settingsAnchor)
+                                 awake: awake, updater: updater, anchor: state.settingsAnchor,
+                                 openWhatsNew: openWhatsNew)
+                } else if state.showWhatsNew {
+                    WhatsNewView()
                 } else {
                     switch state.tab {
                     case .clipboard:
@@ -89,6 +92,10 @@ struct IslandView: View {
                 UpdateBar(updater: updater)
                     .frame(height: Metrics.updateBarHeight, alignment: .top)
                     .transition(.opacity)
+            } else if state.whatsNewBar == .shown {
+                WhatsNewBar(open: openWhatsNew, close: closeWhatsNewBar)
+                    .frame(height: Metrics.updateBarHeight, alignment: .top)
+                    .transition(.opacity)
             }
         }
     }
@@ -99,43 +106,80 @@ struct IslandView: View {
         withAnimation(.spring(response: 0.3, dampingFraction: 0.85)) {
             state.tab = t
             state.showSettings = false
+            state.showWhatsNew = false
         }
     }
 
     func openSettings(_ open: Bool, at anchor: String? = nil) {
         state.settingsAnchor = anchor
-        withAnimation(.spring(response: 0.3, dampingFraction: 0.85)) { state.showSettings = open }
+        withAnimation(.spring(response: 0.3, dampingFraction: 0.85)) {
+            state.showSettings = open
+            if open { state.showWhatsNew = false }
+        }
     }
 
+    /// Плашка «Что нового» или строка «Версия» в настройках: список изменений вместо вкладки
+    func openWhatsNew() {
+        WhatsNew.markSeen()
+        withAnimation(.spring(response: 0.3, dampingFraction: 0.85)) {
+            state.showSettings = false
+            state.showWhatsNew = true
+            if state.whatsNewBar == .shown { state.whatsNewBar = .closed }
+        }
+    }
+
+    func closeWhatsNewBar() {
+        WhatsNew.markSeen()
+        withAnimation(.easeOut(duration: 0.2)) { state.whatsNewBar = .closed }
+    }
+
+    /// Пока в буфере выбраны записи, вместо вкладок и кнопок — что с ними сделать
     var topBar: some View {
         let side = max(0, (Metrics.expanded.width - state.notch.width) / 2)
+        let selecting = !clip.selection.isEmpty
         return HStack(spacing: 0) {
-            HStack(spacing: 2) {
-                ForEach(Tab.allCases, id: \.self) { t in
-                    TabButton(tab: t, selected: state.tab == t && !state.showSettings, ns: tabNS) { select(t) }
+            Group {
+                if selecting {
+                    SelectionActions(clip: clip, leading: true)
+                } else {
+                    HStack(spacing: 2) {
+                        ForEach(Tab.allCases, id: \.self) { t in
+                            TabButton(tab: t, selected: state.tab == t && !state.showSettings && !state.showWhatsNew,
+                                      ns: tabNS) { select(t) }
+                        }
+                    }
                 }
             }
+            .transition(.opacity)
             .padding(.leading, 12)
             .frame(width: side, alignment: .leading)
 
             Color.clear.frame(width: state.notch.width)
 
-            HStack(spacing: 6) {
-                // «Держать экран включенным»: по клику — меню сроков прямо под кнопкой
-                GeometryReader { g in
-                    SleepButton(slashed: awake.active, help: awake.statusText) {
-                        state.openMenu?(awake.makeMenu(header: true), g.frame(in: .global))
+            Group {
+                if selecting {
+                    SelectionActions(clip: clip, leading: false)
+                } else {
+                    HStack(spacing: 6) {
+                        // «Держать экран включенным»: по клику — меню сроков прямо под кнопкой
+                        GeometryReader { g in
+                            SleepButton(slashed: awake.active, help: awake.statusText) {
+                                state.openMenu?(awake.makeMenu(header: true), g.frame(in: .global))
+                            }
+                        }
+                        .frame(width: 26, height: 26)
+                        CircleIconButton(systemName: "gearshape", help: "Настройки", active: state.showSettings) {
+                            openSettings(!state.showSettings)
+                        }
                     }
                 }
-                .frame(width: 26, height: 26)
-                CircleIconButton(systemName: "gearshape", help: "Настройки", active: state.showSettings) {
-                    openSettings(!state.showSettings)
-                }
             }
+            .transition(.opacity)
             .padding(.trailing, 12)
             .frame(width: side, alignment: .trailing)
         }
         .frame(height: state.topBarHeight)
+        .animation(.easeOut(duration: 0.15), value: selecting)
     }
 }
 

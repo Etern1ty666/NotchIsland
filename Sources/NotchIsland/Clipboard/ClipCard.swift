@@ -91,6 +91,8 @@ struct ClipCard: View {
     let copied: Bool
     /// Место в выборе (⌘-клик), с единицы: в таком порядке выбранные и скопируются. nil — не выбрана
     let selection: Int?
+    /// Не подходит к выбранным (текст к файлам и наоборот): серая, ⌘-клик её не выбирает
+    let dimmed: Bool
     /// Сейчас — от него «5 мин» на записи; меняется, пока остров открыт
     let now: Date
     /// Клик: скопировать или, с ⌘, выбрать — решает вкладка
@@ -116,13 +118,16 @@ struct ClipCard: View {
                 shape.strokeBorder(Color.white.opacity(item.isVisual && hover ? 0.45 : 0), lineWidth: 1)
             }
         }
+        .saturation(dimmed ? 0 : 1)
+        .opacity(dimmed ? 0.35 : 1)
         .contentShape(shape)
         .onHover { hover = $0 }
         .onTapGesture(perform: onTap)
         .onDrag(onDrag)
-        .help(helpText)
+        .help(dimmed ? L("Текст и файлы вместе не вставить — эту запись не выбрать вместе с выбранными") : helpText)
         .animation(.easeOut(duration: 0.12), value: hover)
         .animation(.easeOut(duration: 0.12), value: selection)
+        .animation(.easeOut(duration: 0.15), value: dimmed)
     }
 
     var selected: Bool { selection != nil && !copied }

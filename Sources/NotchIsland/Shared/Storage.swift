@@ -31,6 +31,8 @@ enum DefaultsKey {
     /// Версия, в которой остров раскрыли впервые: есть запись — зелёная подсказка вокруг выреза
     /// больше не нужна. Прежние версии писали сюда при каждом обновлении — у давних пользователей она уже есть
     static let islandHintVersion = "islandHintVersion"
+    /// Версия, чьё «Что нового» уже видели (открыли или спрятали плашку)
+    static let whatsNewSeen = "whatsNewSeen"
     /// Автозапуск уже включали один раз после установки
     static let autostartInitialized = "autostartInitialized"
 }

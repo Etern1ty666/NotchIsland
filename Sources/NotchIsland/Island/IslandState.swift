@@ -21,6 +21,10 @@ final class IslandState: ObservableObject {
     @Published var showHint = UserDefaults.standard.string(forKey: DefaultsKey.islandHintVersion) == nil
     /// Есть обновление или оно ставится — внизу острова полоса с кнопкой и прогрессом
     @Published var updateBar = false
+    /// Приложение обновилось — внизу острова плашка «Что нового» (полоса обновления важнее и встаёт на её место)
+    @Published var whatsNewBar = WhatsNewBarState.none
+    /// Открыт список изменений «Что нового» — вместо вкладки, как настройки
+    @Published var showWhatsNew = false
     /// Показать меню под кнопкой (её рамка в координатах острова) или, без рамки, у курсора
     var openMenu: ((NSMenu, CGRect?) -> Void)?
     /// Меню карточки статистики или Claude — те же подробности, что у её значка в строке меню
@@ -35,7 +39,7 @@ final class IslandState: ObservableObject {
         case .clipboard: tabHeight = Metrics.clipboardHeight
         case .stats: tabHeight = Metrics.statsHeight
         }
-        return tabHeight + (updateBar ? Metrics.updateBarHeight : 0)
+        return tabHeight + (updateBar || whatsNewBar != .none ? Metrics.updateBarHeight : 0)
     }
 
     /// Верхняя строка раскрытого острова: по высоте выреза, но не ниже кнопок

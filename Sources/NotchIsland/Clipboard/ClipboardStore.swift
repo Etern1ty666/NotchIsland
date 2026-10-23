@@ -308,9 +308,9 @@ final class ClipboardStore: ObservableObject {
         markCopied([item.id])
     }
 
-    /// Несколько записей разом, в порядке выбора. Одни тексты — одним текстом, каждый с новой строки;
-    /// иначе каждая запись — отдельным элементом буфера: текст текстом, картинки, скриншоты и файлы — файлами.
-    /// Файлами Finder, почта и мессенджеры вставляют всё сразу, а картинками — часто только первую
+    /// Несколько записей разом, в порядке выбора. Тексты — одним текстом, каждый с новой строки;
+    /// картинки, скриншоты и файлы — файлами: так Finder, почта и мессенджеры вставляют все сразу,
+    /// а картинками — часто только первую. Текст вместе с файлами не выбрать (см. `canSelect`)
     func copy(_ list: [ClipItem]) {
         guard list.count > 1 else {
             if let item = list.first { copy(item) }
@@ -321,9 +321,7 @@ final class ClipboardStore: ObservableObject {
         if list.allSatisfy({ $0.kind == .text }) {
             pb.setString(list.map(\.text).joined(separator: "\n"), forType: .string)
         } else {
-            pb.writeObjects(list.flatMap { item -> [NSPasteboardWriting] in
-                item.kind == .text ? [item.text as NSString] : item.urls.map { $0 as NSURL }
-            })
+            pb.writeObjects(list.flatMap(\.urls) as [NSURL])
         }
         lastCount = pb.changeCount
         markCopied(list.map(\.id))
@@ -351,9 +349,25 @@ final class ClipboardStore: ObservableObject {
         selection.compactMap { id in items.first { $0.id == id } }
     }
 
-    /// ⌘-клик: добавить запись к выбору или убрать из него
+    /// ⌘-клик: добавить запись к выбору или убрать из него. Неподходящая к выбранным — не добавляется
     func toggleSelection(_ item: ClipItem) {
-        if let i = selection.firstIndex(of: item.id) { selection.remove(at: i) } else { selection.append(item.id) }
+        if let i = selection.firstIndex(of: item.id) {
+            selection.remove(at: i)
+        } else if canSelect(item) {
+            selection.append(item.id)
+        }
+    }
+
+    /// Текст и файлы вместе не вставить: приложения берут что-то одно, обычно файлы. Поэтому выбрать можно
+    /// записи одного рода — тексты или картинки, скриншоты и файлы; какого — решает первая выбранная
+    func canSelect(_ item: ClipItem) -> Bool {
+        guard let textOnly = selectionIsText else { return true }
+        return textOnly == (item.kind == .text)
+    }
+
+    /// Выбраны тексты (true) или файлы и картинки (false); nil — ничего не выбрано
+    var selectionIsText: Bool? {
+        selectedItems.first.map { $0.kind == .text }
     }
 
     func clearSelection() {

@@ -32,6 +32,8 @@ final class IslandController: NSObject {
                             styleMask: [.borderless, .nonactivatingPanel], backing: .buffered, defer: true)
         super.init()
         state.notch = Self.notchSize(on: screen)
+        // обновились с прошлого запуска — внизу острова плашка «Что нового»
+        if WhatsNew.checkOnLaunch() { state.whatsNewBar = .shown }
 
         for p in [panel, hitPanel, keyPanel] as [NSPanel] {
             p.isFloatingPanel = true
@@ -328,10 +330,13 @@ final class IslandController: NSObject {
         clip.clearSelection()
         panel.ignoresMouseEvents = true
         hitPanel.ignoresMouseEvents = false
-        // при следующем раскрытии — снова вкладки; меняем, когда содержимое уже погасло
+        // при следующем раскрытии — снова вкладки, а спрятанная «Что нового» отдаёт свою высоту;
+        // меняем, когда содержимое уже погасло
         DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) { [weak self] in
             guard let self, !self.state.expanded else { return }
             self.state.showSettings = false
+            self.state.showWhatsNew = false
+            if self.state.whatsNewBar == .closed { self.state.whatsNewBar = .none }
         }
     }
 }

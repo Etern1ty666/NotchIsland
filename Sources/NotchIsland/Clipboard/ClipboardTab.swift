@@ -3,7 +3,7 @@ import SwiftUI
 /// Вкладка «Буфер»: вся история, новые первыми; под ней — подсказки (их можно спрятать).
 /// Если macOS не даёт читать папку со скриншотами — сверху полоска с кнопкой «Разрешить».
 /// После удаления внизу на несколько секунд — плашка «Вернуть»; пока ⌘-кликом выбраны записи —
-/// плашка с тем, что с ними сделать
+/// внизу сколько их, а действия с ними — вверху острова вместо вкладок
 struct ClipboardTab: View {
     @ObservedObject var clip: ClipboardStore
     /// Остров раскрыт — при каждом раскрытии сбрасываем «Скопировано»
@@ -25,7 +25,7 @@ struct ClipboardTab: View {
                         if clip.showTips {
                             ClipTips { withAnimation(.easeOut(duration: 0.2)) { clip.showTips = false } }
                         }
-                        // последний ряд можно докрутить из-под плашки выбора
+                        // последний ряд можно докрутить из-под надписи «выбрано»
                         if !clip.selection.isEmpty { Color.clear.frame(height: 24) }
                     }
                 }
@@ -44,7 +44,10 @@ struct ClipboardTab: View {
                     .id(d.id)
                     .transition(.opacity.combined(with: .move(edge: .bottom)))
                 }
-                if !clip.selection.isEmpty { selectionBar }
+                if !clip.selection.isEmpty {
+                    SelectionCount(count: clip.selection.count)
+                        .transition(.opacity.combined(with: .move(edge: .bottom)))
+                }
             }
         }
         .animation(.easeOut(duration: 0.2), value: clip.deletion)
@@ -75,11 +78,15 @@ struct ClipboardTab: View {
 
     /// Записи потоком: каждая своего размера, текст не шире двух третей острова
     func clipGrid(_ items: [ClipItem]) -> some View {
-        FlowLayout(spacing: 8, maxItemWidth: 400) {
+        // первая выбранная решает, что ещё можно выбрать: остальные серые (см. ClipboardStore.canSelect)
+        let textOnly = clip.selectionIsText
+        return FlowLayout(spacing: 8, maxItemWidth: 400) {
             ForEach(items) { item in
+                let index = clip.selection.firstIndex(of: item.id)
                 ClipCard(item: item,
                          copied: clip.copied.contains(item.id),
-                         selection: clip.selection.firstIndex(of: item.id).map { $0 + 1 },
+                         selection: index.map { $0 + 1 },
+                         dimmed: index == nil && textOnly.map { $0 != (item.kind == .text) } == true,
                          now: now,
                          onTap: { tap(item) },
                          onDelete: { withAnimation(.easeOut(duration: 0.2)) { clip.delete([item]) } },
@@ -96,20 +103,6 @@ struct ClipboardTab: View {
             clip.clearSelection()
             clip.copy(item)
         }
-    }
-
-    // MARK: Выбранные
-
-    var selectionBar: some View {
-        let list = clip.selectedItems
-        // в Finder — только то, что лежит на диске само по себе; копии картинок из буфера — наши, служебные
-        let onDisk = list.filter { $0.kind == .files || $0.kind == .screenshot }.flatMap(\.urls)
-        return SelectionBar(count: list.count,
-                            onCopy: { clip.copySelection() },
-                            onReveal: onDisk.isEmpty ? nil : { NSWorkspace.shared.activateFileViewerSelecting(onDisk) },
-                            onDelete: { withAnimation(.easeOut(duration: 0.2)) { clip.deleteSelection() } },
-                            onClear: { clip.clearSelection() })
-            .transition(.opacity.combined(with: .move(edge: .bottom)))
     }
 
     func undoText(_ d: ClipboardStore.Deletion) -> String {
@@ -136,51 +129,85 @@ struct ClipboardTab: View {
     }
 }
 
-/// «Выбрано: 3 · Скопировать · 📁 · 🗑 · ✕» — внизу вкладки, пока ⌘-кликом выбраны записи.
-/// С клавиатуры то же самое: ⌘C, ⌫, Esc
-struct SelectionBar: View {
+/// «3 элемента выбрано» — внизу вкладки, пока ⌘-кликом выбраны записи. Что с ними сделать — вверху острова
+struct SelectionCount: View {
     let count: Int
-    let onCopy: () -> Void
-    /// Среди выбранных есть файлы или скриншоты — показать их в Finder
-    let onReveal: (() -> Void)?
-    let onDelete: () -> Void
-    let onClear: () -> Void
-    @State private var hover = false
+
+    var body: some View {
+        Text(Self.text(count))
+            .font(.system(size: 12, weight: .medium).monospacedDigit())
+            .foregroundStyle(Color.white.opacity(0.9))
+            .padding(.horizontal, 14)
+            .frame(height: 28)
+            .background(Capsule().fill(Color(white: 0.17)))
+            .overlay(Capsule().strokeBorder(Theme.selection.opacity(0.6), lineWidth: 1))
+            .shadow(color: .black.opacity(0.5), radius: 8, y: 2)
+    }
+
+    /// «1 элемент выбран», «3 элемента выбрано», «21 элемент выбран»
+    static func text(_ n: Int) -> String {
+        let noun = countText(n, ru: ("элемент", "элемента", "элементов"), en: ("item", "items"))
+        return n % 10 == 1 && n % 100 != 11 ? L("%@ выбран", noun) : L("%@ выбрано", noun)
+    }
+}
+
+/// Что сделать с выбранными — в верхней строке острова вместо вкладок и кнопок, пока выбор есть
+/// (см. `IslandView.topBar`): слева от выреза «Скопировать» и «Показать в Finder», справа «Удалить»
+/// и «Снять выбор». С клавиатуры то же самое: ⌘C, ⌫, Esc
+struct SelectionActions: View {
+    @ObservedObject var clip: ClipboardStore
+    /// Левая половина строки (до выреза) или правая
+    let leading: Bool
 
     var body: some View {
         HStack(spacing: 6) {
-            Image(systemName: "checkmark.circle.fill")
-                .font(.system(size: 13, weight: .semibold))
-                .foregroundStyle(Theme.selection)
-            Text(L("Выбрано: %@", "\(count)"))
-                .font(.system(size: 12, weight: .medium).monospacedDigit())
-                .foregroundStyle(Color.white.opacity(0.85))
-                .fixedSize()
-                .padding(.trailing, 4)
-            Button(action: onCopy) {
-                Label(L("Скопировать"), systemImage: "doc.on.doc")
-                    .font(.system(size: 12, weight: .semibold))
-                    .foregroundStyle(Color.white)
-                    .padding(.horizontal, 10)
-                    .frame(height: 22)
-                    .background(Capsule().fill(Theme.selection.opacity(hover ? 1 : 0.85)))
-                    .contentShape(Capsule())
+            if leading {
+                SelectionButton(title: "Скопировать", icon: "doc.on.doc", filled: true,
+                                help: "Скопировать вместе, по порядку номеров (⌘C)") { clip.copySelection() }
+                let onDisk = filesOnDisk
+                if !onDisk.isEmpty {
+                    CircleIconButton(systemName: "folder", help: "Показать в Finder") {
+                        NSWorkspace.shared.activateFileViewerSelecting(onDisk)
+                    }
+                }
+            } else {
+                SelectionButton(title: "Удалить", icon: "trash", filled: false, help: "Удалить выбранные (⌫)") {
+                    withAnimation(.easeOut(duration: 0.2)) { clip.deleteSelection() }
+                }
+                CircleIconButton(systemName: "xmark", help: "Снять выбор (Esc)") { clip.clearSelection() }
             }
-            .buttonStyle(.plain)
-            .onHover { hover = $0 }
-            .help(L("Скопировать вместе, по порядку номеров (⌘C)"))
-            if let onReveal {
-                ClipActionButton(systemName: "folder", help: "Показать в Finder", action: onReveal)
-            }
-            ClipActionButton(systemName: "trash", help: "Удалить выбранные (⌫)", action: onDelete)
-            ClipActionButton(systemName: "xmark", help: "Снять выбор (Esc)", action: onClear)
         }
-        .padding(.leading, 10)
-        .padding(.trailing, 4)
-        .frame(height: 30)
-        .background(Capsule().fill(Color(white: 0.17)))
-        .overlay(Capsule().strokeBorder(Theme.selection.opacity(0.5), lineWidth: 1))
-        .shadow(color: .black.opacity(0.5), radius: 8, y: 2)
+    }
+
+    /// В Finder — только то, что лежит на диске само по себе; копии картинок из буфера — наши, служебные
+    var filesOnDisk: [URL] {
+        clip.selectedItems.filter { $0.kind == .files || $0.kind == .screenshot }.flatMap(\.urls)
+    }
+}
+
+/// Кнопка-«таблетка» со значком в верхней строке при выборе: «Скопировать» — синяя, «Удалить» — красным текстом
+struct SelectionButton: View {
+    let title: String
+    let icon: String
+    let filled: Bool
+    let help: String
+    let action: () -> Void
+    @State private var hover = false
+
+    var body: some View {
+        Button(action: action) {
+            Label(L(title), systemImage: icon)
+                .font(.system(size: 12, weight: .semibold))
+                .foregroundStyle(filled ? Color.white : Theme.danger)
+                .padding(.horizontal, 12)
+                .frame(height: 26)
+                .background(Capsule().fill(filled ? Theme.selection.opacity(hover ? 1 : 0.85)
+                                                  : Color.white.opacity(hover ? 0.16 : 0.08)))
+                .contentShape(Capsule())
+        }
+        .buttonStyle(.plain)
+        .onHover { hover = $0 }
+        .help(L(help))
     }
 }
 

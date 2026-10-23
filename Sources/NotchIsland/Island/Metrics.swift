@@ -7,7 +7,7 @@ enum Metrics {
     /// в статистике целиком видна «Система» и выглядывает верх карточек Claude — видно, что ниже есть ещё
     static let clipboardHeight: CGFloat = 280
     static let statsHeight: CGFloat = 372
-    /// Полоса с зелёной кнопкой «Обновить» внизу — остров на неё подрастает, вкладки не сжимаются
+    /// Полоса с зелёной кнопкой «Обновить» (или с «Что нового») внизу — остров на неё подрастает, вкладки не сжимаются
     static let updateBarHeight: CGFloat = 38
     static let maxHeight = max(expanded.height, clipboardHeight, statsHeight) + updateBarHeight
     /// Вогнутые скругления сверху, которыми раскрытый остров переходит в край экрана

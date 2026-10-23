@@ -14,6 +14,8 @@ struct SettingsView: View {
     let updater: Updater
     /// К какой строке прокрутить при открытии
     var anchor: String?
+    /// «Что нового» у строки «Версия» — список изменений вместо настроек
+    var openWhatsNew: () -> Void = {}
     @ObservedObject var loginItem = LoginItem.shared
 
     /// Строка «Аккаунт Claude» — сюда ведут карточки и значки Claude без входа
@@ -69,7 +71,10 @@ struct SettingsView: View {
                         .opacity(loginItem.available ? 1 : 0.5)
                 }
                 SettingsRow(icon: "arrow.down.circle", title: L("Версия %@", Updater.currentVersion)) {
-                    UpdateStatus(updater: updater)
+                    HStack(spacing: 8) {
+                        PillButton(title: "Что нового", action: openWhatsNew)
+                        UpdateStatus(updater: updater)
+                    }
                 }
             }
         }
