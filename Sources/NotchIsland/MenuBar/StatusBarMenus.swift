@@ -60,12 +60,13 @@ extension StatusBarController {
                 addItem(to: menu, "Открыть «Мониторинг системы»", #selector(openActivityMonitor(_:)))
                     .representedObject = s.rawValue
             }
-        case .claude(let w):
+        case .claude:
             // заголовок: оба окна — сколько израсходовано и через сколько сброс
             if !usage.needsAccount { addHeader(to: menu, ClaudeWidget.allCases.map(claudeHeader)) }
+            // «Обновить» — первой кнопкой, без аккаунта вместо неё «Подключить Claude»
             if usage.needsAccount {
                 addItem(to: menu, "Подключить Claude", #selector(connectClaude))
-            } else if usage.window(w) == nil {
+            } else {
                 addItem(to: menu, "Обновить", #selector(refreshClaude))
             }
             addItem(to: menu, "Открыть лимиты на claude.ai", #selector(openClaudeUsage))
